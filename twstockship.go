@@ -6,11 +6,11 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gocolly/colly"
+	"github.com/jimmywmt/gotool"
 	log "github.com/sirupsen/logrus"
 	"gocv.io/x/gocv"
 )
@@ -84,8 +84,7 @@ func generateImageCollector() *colly.Collector {
 
 			cmd := exec.Command("tesseract", "img.jpeg", "stdout", "--psm", "13", "--oem", "0", "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 			out, _ := cmd.Output()
-			s = strings.TrimSuffix(string(out), "\n")
-			s = compressStr(s)
+			s = gotool.CompressStr(string(out))
 
 		}
 	})
@@ -258,7 +257,7 @@ func readStockList() {
 			data := string(e.Text)
 			idName := strings.Split(data, "\u3000")
 			if len(idName) > 1 {
-				stocks = append(stocks, &stock{id: compressStr(idName[0]), name: compressStr(idName[1])})
+				stocks = append(stocks, &stock{id: gotool.CompressStr(idName[0]), name: gotool.CompressStr(idName[1])})
 			}
 		}
 		if len(stocks) > 0 {
@@ -267,14 +266,6 @@ func readStockList() {
 	})
 
 	c.Visit("https://isin.twse.com.tw/isin/C_public.jsp?strMode=2")
-}
-
-func compressStr(str string) string {
-	if str == "" {
-		return ""
-	}
-	reg := regexp.MustCompile("\\s+")
-	return reg.ReplaceAllString(str, "")
 }
 
 func main() {

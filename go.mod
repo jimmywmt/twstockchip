@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/gocolly/colly v1.2.0
+	github.com/jimmywmt/gotool v0.0.0-20220206063909-d363ec29bdd1
 	github.com/sirupsen/logrus v1.8.1
 	gocv.io/x/gocv v0.29.0
 )
@@ -22,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.6.1 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
+	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
