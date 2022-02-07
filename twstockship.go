@@ -25,6 +25,8 @@ var imgFile = "CaptchaImage.jpeg"
 var stockID, s, evValue, vsValue, vsgValue string
 var success, request bool
 var stocks []*stock
+var requestImageCount = 0
+var matchCount = 0
 
 func init() {
 
@@ -70,6 +72,7 @@ func generateImageCollector() *colly.Collector {
 		c.Visit(img_addr)
 
 		if request {
+			requestImageCount++
 			img := gocv.IMRead(imgFile, gocv.IMReadColor)
 			kernel := gocv.GetStructuringElement(gocv.MorphRect, image.Pt(3, 3))
 			gocv.Erode(img, &img, kernel)
@@ -124,6 +127,7 @@ func generateDownloadCollector() *colly.Collector {
 	c.OnHTML("span[id='Label_ErrorMsg']", func(e *colly.HTMLElement) {
 		result_check := e.Text
 		if len(result_check) == 0 {
+			matchCount++
 
 			c.OnResponse(func(r *colly.Response) {
 				reader := bytes.NewReader(r.Body)
@@ -203,7 +207,7 @@ func downloadChip(target string) {
 			c2.Post("https://bsr.twse.com.tw/bshtm/bsMenu.aspx", formData)
 		} else {
 			log.WithFields(log.Fields{
-				"captcha number": s,
+				"captcha string": s,
 			}).Infoln("wrong length of captcha")
 		}
 
@@ -269,6 +273,7 @@ func readStockList() {
 }
 
 func main() {
+	start := time.Now()
 	request = false
 	for !request {
 		readStockList()
@@ -280,4 +285,11 @@ func main() {
 		log.Infoln("wait 2 seconds")
 		time.Sleep(2 * time.Second)
 	}
+	elapsed := time.Since(start)
+	log.WithFields(log.Fields{
+		"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
+	}).Info("captcha match rate")
+	log.WithFields(log.Fields{
+		"elapsed": elapsed,
+	}).Printf("process took")
 }
