@@ -151,6 +151,8 @@ func generateDownloadCollector() *colly.Collector {
 
 			}
 		} else if result_check == "查無資料" {
+			matchCount++
+
 			log.WithFields(log.Fields{
 				"stock": stockID,
 			}).Warnln("no input stock")
