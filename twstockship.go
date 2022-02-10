@@ -11,11 +11,12 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/jimmywmt/gotool"
+	"github.com/jimmywmt/twstockchip/model"
 	log "github.com/sirupsen/logrus"
 	"gocv.io/x/gocv"
 )
 
-type stock struct {
+type record struct {
 	id   string
 	name string
 }
@@ -24,7 +25,7 @@ var imgFile = "CaptchaImage.jpeg"
 
 var stockID, s, evValue, vsValue, vsgValue string
 var success, request bool
-var stocks []*stock
+var stocks []*record
 var requestImageCount = 0
 var matchCount = 0
 
@@ -62,7 +63,7 @@ func generateImageCollector() *colly.Collector {
 			err := ioutil.WriteFile(imgFile, body, 0755)
 
 			if err != nil {
-				log.Warnln(err)
+				log.WithError(err).Warnln("connection failed")
 				request = false
 			} else {
 				log.Infoln("download captcha image success")
@@ -105,7 +106,7 @@ func generateImageCollector() *colly.Collector {
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.Warnln("request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
 		request = false
 	})
 
@@ -165,7 +166,7 @@ func generateDownloadCollector() *colly.Collector {
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.Warnln("request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
 		request = false
 	})
 
@@ -228,7 +229,7 @@ func downloadChip(target string) {
 
 func readStockList() {
 	status := false
-	stocks = make([]*stock, 0, 2048)
+	stocks = make([]*record, 0, 2048)
 
 	c := colly.NewCollector(
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edge/44.18363.8131"),
@@ -248,7 +249,7 @@ func readStockList() {
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.Warnln("request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
 	})
 
 	c.OnHTML("table.h4 tr td[bgcolor='#FAFAD2']", func(e *colly.HTMLElement) {
@@ -263,7 +264,10 @@ func readStockList() {
 			data := string(e.Text)
 			idName := strings.Split(data, "\u3000")
 			if len(idName) > 1 {
-				stocks = append(stocks, &stock{id: gotool.CompressStr(idName[0]), name: gotool.CompressStr(idName[1])})
+				id := gotool.CompressStr(idName[0])
+				name := gotool.CompressStr(idName[1])
+				stocks = append(stocks, &record{id: id, name: name})
+				model.SmartAddStock(id, name)
 			}
 		}
 		if len(stocks) > 0 {
@@ -275,6 +279,7 @@ func readStockList() {
 }
 
 func main() {
+	model.InitDBModel("./twstockship.sqlite")
 	start := time.Now()
 	request = false
 	for !request {
