@@ -278,7 +278,44 @@ func readStockList() {
 	c.Visit("https://isin.twse.com.tw/isin/C_public.jsp?strMode=2")
 }
 
+func checkToday() bool {
+	check := false
+
+	c := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edge/44.18363.8131"),
+	)
+
+	c.OnHTML("span#Label_Date", func(e *colly.HTMLElement) {
+		date := strings.ReplaceAll(e.Text, "/", "-")
+		today := time.Now().Format("2006-01-02")
+		if date != today {
+			log.WithFields(log.Fields{
+				"date":  date,
+				"today": today,
+			}).Infoln("today data hasn't released")
+		} else {
+			log.WithFields(log.Fields{
+				"today": today,
+			}).Infoln("today data has released")
+			check = true
+		}
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+	})
+
+	c.Visit("https://bsr.twse.com.tw/bshtm/bsWelcome.aspx")
+
+	return check
+}
+
 func main() {
+	for !checkToday() {
+		log.Infoln("wait 1 minute")
+		time.Sleep(time.Minute)
+	}
+
 	model.InitDBModel("./twstockship.sqlite")
 	start := time.Now()
 	request = false
