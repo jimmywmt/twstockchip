@@ -3,7 +3,7 @@ module github.com/jimmywmt/twstockchip
 go 1.17
 
 require (
-	github.com/gocolly/colly v1.2.0
+	github.com/gocolly/colly/v2 v2.1.0
 	github.com/jimmywmt/gotool v0.0.0-20220206063909-d363ec29bdd1
 	github.com/onrik/gorm-logrus v0.3.0
 	github.com/sirupsen/logrus v1.8.1

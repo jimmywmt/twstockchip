@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/v2"
 	"github.com/jimmywmt/gotool"
 	"github.com/jimmywmt/twstockchip/model"
 	log "github.com/sirupsen/logrus"
