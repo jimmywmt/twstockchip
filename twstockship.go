@@ -239,9 +239,6 @@ func readStockList() {
 
 	c.OnRequest(func(r *colly.Request) {
 		r.ResponseCharacterEncoding = "big5"
-	})
-
-	c.OnRequest(func(r *colly.Request) {
 		log.WithFields(log.Fields{
 			"url":    r.URL,
 			"method": r.Method,
@@ -285,6 +282,13 @@ func checkToday() bool {
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edge/44.18363.8131"),
 	)
 
+	c.OnRequest(func(r *colly.Request) {
+		log.WithFields(log.Fields{
+			"url":    r.URL,
+			"method": r.Method,
+		}).Debugln("visit webpage")
+	})
+
 	c.OnHTML("span#Label_Date", func(e *colly.HTMLElement) {
 		date := strings.ReplaceAll(e.Text, "/", "-")
 		today := time.Now().Format("2006-01-02")
@@ -310,10 +314,18 @@ func checkToday() bool {
 	return check
 }
 
-func downloadDealerInfo() {
+func downloadDealerInfo() bool {
+	result := true
 	c := colly.NewCollector(
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edge/44.18363.8131"),
 	)
+
+	c.OnRequest(func(r *colly.Request) {
+		log.WithFields(log.Fields{
+			"url":    r.URL,
+			"method": r.Method,
+		}).Debugln("visit webpage")
+	})
 
 	c.OnHTML("html", func(e *colly.HTMLElement) {
 		c.OnResponse(func(r *colly.Response) {
@@ -333,9 +345,11 @@ func downloadDealerInfo() {
 
 	c.OnError(func(r *colly.Response, err error) {
 		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+		result = false
 	})
 
 	c.Visit("https://www.twse.com.tw/brokerService/brokerServiceAudit")
+	return result
 }
 
 func main() {
