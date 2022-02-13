@@ -310,6 +310,34 @@ func checkToday() bool {
 	return check
 }
 
+func downloadDealerInfo() {
+	c := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edge/44.18363.8131"),
+	)
+
+	c.OnHTML("html", func(e *colly.HTMLElement) {
+		c.OnResponse(func(r *colly.Response) {
+			reader := bytes.NewReader(r.Body)
+			body, _ := ioutil.ReadAll(reader)
+			err := ioutil.WriteFile("./dealers.xls", body, 0755)
+
+			if err != nil {
+				log.Warnln(err)
+				request = false
+			} else {
+				log.Infoln("download dealers info success")
+			}
+		})
+		c.Visit("https://www.twse.com.tw/brokerService/outPutExcel")
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+	})
+
+	c.Visit("https://www.twse.com.tw/brokerService/brokerServiceAudit")
+}
+
 func main() {
 	for !checkToday() {
 		log.Infoln("wait 1 minute")
