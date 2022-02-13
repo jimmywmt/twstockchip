@@ -11,6 +11,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jimmywmt/gotool"
+	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
 	log "github.com/sirupsen/logrus"
 	"gocv.io/x/gocv"
@@ -353,18 +354,22 @@ func downloadDealerInfo() bool {
 }
 
 func main() {
-	for !checkToday() {
-		log.Infoln("wait 1 minute")
-		time.Sleep(time.Minute)
+	start := time.Now()
+	model.InitDBModel("./twstockship.sqlite")
+	if downloadDealerInfo() {
+		dealerreader.ReadDealerXLS("./dealers.xls")
 	}
 
-	model.InitDBModel("./twstockship.sqlite")
-	start := time.Now()
 	request = false
 	for !request {
 		readStockList()
 	}
 	log.Infoln("update stocks information success")
+
+	for !checkToday() {
+		log.Infoln("wait 1 minute")
+		time.Sleep(time.Minute)
+	}
 
 	for _, s := range stocks {
 		downloadChip(s.id)
