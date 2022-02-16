@@ -24,11 +24,12 @@ type record struct {
 
 var imgFile = "CaptchaImage.jpeg"
 
-var stockID, s, evValue, vsValue, vsgValue string
+var stockID, s, evValue, vsValue, vsgValue, today string
 var success, request bool
 var stocks []*record
 var requestImageCount = 0
 var matchCount = 0
+var slackWebhookURL = "https://hooks.slack.com/services/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"
 
 func init() {
 
@@ -134,7 +135,7 @@ func generateDownloadCollector() *colly.Collector {
 			c.OnResponse(func(r *colly.Response) {
 				reader := bytes.NewReader(r.Body)
 				body, _ := ioutil.ReadAll(reader)
-				err := ioutil.WriteFile("./csv/"+stockID+".csv", body, 0755)
+				err := ioutil.WriteFile("./csv/"+today+"/"+stockID+".csv", body, 0755)
 
 				if err != nil {
 					log.Warnln(err)
@@ -292,7 +293,6 @@ func checkToday() bool {
 
 	c.OnHTML("span#Label_Date", func(e *colly.HTMLElement) {
 		date := strings.ReplaceAll(e.Text, "/", "-")
-		today := time.Now().Format("2006-01-02")
 		if date != today {
 			log.WithFields(log.Fields{
 				"date":  date,
@@ -353,8 +353,31 @@ func downloadDealerInfo() bool {
 	return result
 }
 
+func createDir() {
+	if _, err := os.Stat("./csv"); os.IsNotExist(err) {
+		if err := os.Mkdir("./csv", 0755); err != nil {
+			log.WithError(err).Fatalln("create folder err")
+		}
+		log.WithFields(log.Fields{
+			"dir": "./csv",
+		}).Infoln("create folder")
+	}
+
+	if _, err := os.Stat("./csv/" + today); os.IsNotExist(err) {
+		if err := os.Mkdir("./csv/"+today, 0755); err != nil {
+			log.WithError(err).Fatalln("create folder err")
+		}
+		log.WithFields(log.Fields{
+			"dir": "./csv/" + today,
+		}).Infoln("create folder")
+	}
+}
+
 func main() {
+	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
+	slackWebhook.SentMessage("Start to download today stock ship")
 	start := time.Now()
+	today = time.Now().Format("2006-01-02")
 	model.InitDBModel("./twstockship.sqlite")
 	if downloadDealerInfo() {
 		dealerreader.ReadDealerXLS("./dealers.xls")
@@ -371,6 +394,7 @@ func main() {
 		time.Sleep(time.Minute)
 	}
 
+	createDir()
 	for _, s := range stocks {
 		downloadChip(s.id)
 		log.Infoln("wait 2 seconds")
@@ -383,4 +407,5 @@ func main() {
 	log.WithFields(log.Fields{
 		"elapsed": elapsed,
 	}).Printf("process took")
+	slackWebhook.SentMessage("Download today stock ship finish")
 }

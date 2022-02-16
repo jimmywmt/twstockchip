@@ -33,5 +33,5 @@ func ReadDealerXLS(filepath string) {
 	} else {
 		log.WithError(err).Errorln("open file error")
 	}
-	log.Infoln("update dealer info success")
+	log.Infoln("update dealers information success")
 }
