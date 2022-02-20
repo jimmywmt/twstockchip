@@ -373,6 +373,32 @@ func createDir() {
 	}
 }
 
+func compressFolder() {
+	path := "./csv/" + today
+	log.WithFields(log.Fields{
+		"file": path + ".tar.zst",
+	}).Infoln("compress data")
+
+	cmd := exec.Command("tar", "--exclude", "'.DS_Store'", "-cvf", path+".tar", path)
+	_, err := cmd.Output()
+
+	if err != nil {
+		log.WithError(err).Warnln("compress data fail")
+	}
+
+	cmd = exec.Command("zstd", "--rm", "-19", path+".tar")
+	_, err = cmd.Output()
+
+	if err != nil {
+		log.WithError(err).Warnln("compress data fail")
+	} else {
+		log.WithFields(log.Fields{
+			"file": path + ".tar.zst",
+		}).Infoln("compress data finish")
+	}
+
+}
+
 func main() {
 	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 	slackWebhook.SentMessage("Start to download today stock ship")
@@ -408,4 +434,5 @@ func main() {
 		"elapsed": elapsed,
 	}).Printf("process took")
 	slackWebhook.SentMessage("Download today stock ship finish")
+	compressFolder()
 }
