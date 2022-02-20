@@ -266,7 +266,7 @@ func readStockList() {
 				id := gotool.CompressStr(idName[0])
 				name := gotool.CompressStr(idName[1])
 				stocks = append(stocks, &record{id: id, name: name})
-				model.SmartAddStock(id, name)
+				model.SmartAddStock(&id, &name)
 			}
 		}
 		if len(stocks) > 0 {

@@ -20,4 +20,5 @@ func InitDBModel(file string) {
 
 	DB.AutoMigrate(&Stock{})
 	DB.AutoMigrate(&Dealer{})
+	DB.AutoMigrate(&Transaction{})
 }

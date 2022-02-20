@@ -9,16 +9,16 @@ import (
 
 type Dealer struct {
 	gorm.Model
-	Code string `gorm:"uniqueIndex"`
-	Name string
+	Code *string `gorm:"uniqueIndex;not null"`
+	Name *string `gorm:"not null"`
 }
 
-func SmartAddDealer(code string, name string) {
+func SmartAddDealer(code *string, name *string) {
 	if err := DB.Where("Code = ?", code).First(&Dealer{}).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		DB.Create(&Dealer{Code: code, Name: name})
 		log.WithFields(log.Fields{
-			"code": code,
-			"name": name,
+			"code": *code,
+			"name": *name,
 		}).Infoln("add dealer success")
 	}
 }

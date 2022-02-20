@@ -22,7 +22,7 @@ func ReadDealerXLS(filepath string) {
 				if len(cols) == 5 {
 					code := gotool.CompressStr(cols[0].GetString())
 					name := gotool.CompressStr(cols[1].GetString())
-					model.SmartAddDealer(code, name)
+					model.SmartAddDealer(&code, &name)
 
 				}
 			} else {
