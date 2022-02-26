@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -379,27 +380,50 @@ func compressFolder() {
 		"file": path + ".tar.zst",
 	}).Infoln("compress data")
 
-	cmd := exec.Command("tar", "--exclude", "'.DS_Store'", "-cvf", path+".tar", path)
-	_, err := cmd.Output()
+	cmd := exec.Command("tar", "--exclude", "'.DS_Store'", "--zstd", "-cvf", path+".tar.zst", "-C", "./csv/", today)
 
-	if err != nil {
-		log.WithError(err).Warnln("compress data fail")
-	}
-
-	cmd = exec.Command("zstd", "--rm", "-19", path+".tar")
-	_, err = cmd.Output()
-
-	if err != nil {
+	if _, err := cmd.Output(); err != nil {
 		log.WithError(err).Warnln("compress data fail")
 	} else {
+		cmd = exec.Command("rm", "-rf", path)
+		cmd.Start()
 		log.WithFields(log.Fields{
 			"file": path + ".tar.zst",
 		}).Infoln("compress data finish")
 	}
+}
 
+func uncompressFolder(fileName *string) {
+	cmd := exec.Command("tar", "xvf", *fileName)
+	reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
+	date := reg.FindString(*fileName)
+	log.WithFields(log.Fields{
+		"dir": "./" + date,
+	}).Infoln("uncompress data")
+	if _, err := cmd.Output(); err != nil {
+		log.WithError(err).Warnln("uncompress data fail")
+	} else {
+		log.WithFields(log.Fields{
+			"dir": "./" + date,
+		}).Infoln("uncompress data finish")
+	}
 }
 
 func main() {
+	//         fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
+	//         reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
+	//         firstDate, _ := time.Parse("2006-01-02", "2022-02-08")
+	//         fmt.Println(len(fileList))
+	//         for _, fileName := range fileList {
+	//                 date, _ := time.Parse("2006-01-02", reg.FindString(*fileName))
+	//                 if firstDate.Before(date) || firstDate.Equal(date) {
+	//                         fmt.Println(*fileName)
+	//                         fmt.Println(date)
+	//                         uncompressFolder(fileName)
+	//                         break
+	//                 }
+	//         }
+
 	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 	slackWebhook.SentMessage("Start to download today stock ship")
 	start := time.Now()

@@ -4,13 +4,13 @@ go 1.17
 
 require (
 	github.com/gocolly/colly/v2 v2.1.0
-	github.com/jimmywmt/gotool v0.0.0-20220215072513-40e587cb5b30
+	github.com/jimmywmt/gotool v0.0.0-20220225040019-f0e8f08908cc
 	github.com/onrik/gorm-logrus v0.3.0
 	github.com/shakinm/xlsReader v0.9.10
 	github.com/sirupsen/logrus v1.8.1
 	gocv.io/x/gocv v0.29.0
-	gorm.io/driver/sqlite v1.2.6
-	gorm.io/gorm v1.22.5
+	gorm.io/driver/sqlite v1.3.1
+	gorm.io/gorm v1.23.1
 )
 
 require (
@@ -30,7 +30,7 @@ require (
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/sys v0.0.0-20220224120231-95c6836cb0e7 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
