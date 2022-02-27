@@ -2,18 +2,20 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"image"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jimmywmt/gotool"
+	"github.com/jimmywmt/twstockchip/csvreader"
 	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
 	log "github.com/sirupsen/logrus"
@@ -34,6 +36,7 @@ var stocks []*record
 var requestImageCount = 0
 var matchCount = 0
 var slackWebhookURL = "https://hooks.slack.com/services/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"
+var wg sync.WaitGroup
 
 func init() {
 
@@ -386,8 +389,7 @@ func compressFolder() {
 	if _, err := cmd.Output(); err != nil {
 		log.WithError(err).Warnln("壓縮資料失敗")
 	} else {
-		cmd = exec.Command("rm", "-rf", path)
-		cmd.Start()
+		os.RemoveAll(path)
 		log.WithFields(log.Fields{
 			"file": path + ".tar.zst",
 		}).Infoln("壓縮資料成功")
@@ -436,7 +438,25 @@ func updateEssentialInformation() {
 
 }
 
+func writingRoutine(tasks chan string) {
+	defer wg.Done()
+	var task string
+	dir := "./csv/" + today + "/"
+
+	for {
+		task = <-tasks
+		switch task {
+		case "close":
+			break
+		default:
+			fileName := dir + task + ".csv"
+			csvreader.ReadCSV(fileName, task, today)
+		}
+	}
+}
+
 func main() {
+	runtime.GOMAXPROCS(1)
 	app := &cli.App{
 		Name:  "twstockship",
 		Usage: "臺灣股市交易籌碼資料下載",
@@ -485,12 +505,19 @@ func main() {
 					fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
 					reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
 					firstDate, _ := time.Parse("2006-01-02", c.String("date"))
-					fmt.Println(len(fileList))
 					for _, fileName := range fileList {
-						fileDate, _ := time.Parse("2006-01-02", reg.FindString(*fileName))
+						dateString := reg.FindString(*fileName)
+						fileDate, _ := time.Parse("2006-01-02", dateString)
 						if firstDate.Before(fileDate) || firstDate.Equal(fileDate) {
-							fmt.Println(*fileName)
-							fmt.Println(fileDate)
+							folder := "./" + dateString
+							csvFileList := gotool.DirRegListFiles(folder, ".*csv$")
+							for _, csvFile := range csvFileList {
+								csvNameSlice := strings.Split(*csvFile, "/")
+								nameWithExtension := csvNameSlice[2]
+								sid := nameWithExtension[0 : len(nameWithExtension)-4]
+								csvreader.ReadCSV(*csvFile, sid, dateString)
+							}
+							os.RemoveAll(folder)
 						}
 					}
 					return nil
@@ -503,9 +530,12 @@ func main() {
 				Action: func(c *cli.Context) error {
 					slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 					slackWebhook.SentMessage("開始下載今日交易籌碼")
+					updateEssentialInformation()
+					wg.Add(1)
+					tasks := make(chan string, 2)
+					go writingRoutine(tasks)
 					start := time.Now()
 					today = c.String("date")
-					updateEssentialInformation()
 					for !checkToday() {
 						log.Infoln("暫停1分鐘")
 						time.Sleep(time.Minute)
@@ -514,9 +544,11 @@ func main() {
 					createDir()
 					for _, s := range stocks {
 						downloadChip(s.id)
+						tasks <- s.id
 						log.Infoln("暫停2秒")
 						time.Sleep(2 * time.Second)
 					}
+					tasks <- "close"
 					elapsed := time.Since(start)
 					log.WithFields(log.Fields{
 						"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
@@ -525,6 +557,7 @@ func main() {
 						"elapsed": elapsed,
 					}).Printf("程序用時")
 					slackWebhook.SentMessage("下載今日交易籌碼成功")
+					wg.Wait()
 					compressFolder()
 
 					return nil
