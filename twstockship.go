@@ -384,7 +384,7 @@ func compressFolder() {
 		"file": path + ".tar.zst",
 	}).Infoln("壓縮資料")
 
-	cmd := exec.Command("tar", "--exclude", "'.*'", "--zstd", "-cvf", path+".tar.zst", "-C", "./csv/", today)
+	cmd := exec.Command("tar", "--exclude='.[^/]*'", "--zstd", "-cvf", path+".tar.zst", "-C", "./csv/", today)
 
 	if _, err := cmd.Output(); err != nil {
 		log.WithError(err).Warnln("壓縮資料失敗")
