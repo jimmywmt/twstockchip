@@ -32,7 +32,7 @@ func SmartAddTransaction(stockCode string, dealerCode string, date *string, tid 
 
 	if err := DB.Where("Code = ?", dealerCode).First(&dealer).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		log.WithFields(log.Fields{
-			"code": stockCode,
+			"code": dealerCode,
 		}).Errorln("無股票交易所記錄")
 		return
 	}
