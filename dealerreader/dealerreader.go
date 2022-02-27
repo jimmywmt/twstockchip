@@ -8,12 +8,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func ReadDealerXLS(filepath string) {
-	log.Infoln("start read dealer info")
+func ReadDealerXLS(filepath string) bool {
 	if data, err := xls.OpenFile(filepath); err == nil {
 		sheet, err := data.GetSheet(0)
 		if err != nil {
-			log.WithError(err).Errorln("xls operation error")
+			log.WithError(err).Errorln("xls 操作失敗")
 		}
 
 		for i := 1; i <= sheet.GetNumberRows(); i++ {
@@ -26,12 +25,14 @@ func ReadDealerXLS(filepath string) {
 
 				}
 			} else {
-				log.WithError(err).Errorln("xls operation error")
+				log.WithError(err).Errorln("xls 操作失敗")
 			}
 
 		}
+		log.Infoln("更新股票交易所資料成功")
 	} else {
-		log.WithError(err).Errorln("open file error")
+		log.WithError(err).Errorln("開啓檔案失敗")
+		return false
 	}
-	log.Infoln("update dealers information success")
+	return true
 }

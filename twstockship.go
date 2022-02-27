@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 	"gocv.io/x/gocv"
 )
 
@@ -41,8 +44,6 @@ func init() {
 	})
 
 	log.SetOutput(os.Stdout)
-	log.SetLevel(log.DebugLevel)
-
 }
 
 func generateImageCollector() *colly.Collector {
@@ -54,7 +55,7 @@ func generateImageCollector() *colly.Collector {
 		log.WithFields(log.Fields{
 			"url":    r.URL,
 			"method": r.Method,
-		}).Debugln("visit webpage")
+		}).Debugln("訪問")
 	})
 
 	c.OnHTML("img[border='0']", func(e *colly.HTMLElement) {
@@ -66,10 +67,10 @@ func generateImageCollector() *colly.Collector {
 			err := ioutil.WriteFile(imgFile, body, 0755)
 
 			if err != nil {
-				log.WithError(err).Warnln("connection failed")
+				log.WithError(err).Warnln("連接失敗")
 				request = false
 			} else {
-				log.Infoln("download captcha image success")
+				log.Infoln("下載 captcha 圖片成功")
 			}
 		})
 
@@ -109,7 +110,7 @@ func generateImageCollector() *colly.Collector {
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+		log.WithError(err).Warnln("訪問 URL:", r.Request.URL, "失敗")
 		request = false
 	})
 
@@ -125,7 +126,7 @@ func generateDownloadCollector() *colly.Collector {
 		log.WithFields(log.Fields{
 			"url":    r.URL,
 			"method": r.Method,
-		}).Debugln("visit")
+		}).Debugln("訪問")
 	})
 
 	c.OnHTML("span[id='Label_ErrorMsg']", func(e *colly.HTMLElement) {
@@ -144,7 +145,7 @@ func generateDownloadCollector() *colly.Collector {
 				} else {
 					log.WithFields(log.Fields{
 						"stock": stockID,
-					}).Infoln("download chip file success")
+					}).Infoln("下載交易籌碼檔案成功")
 				}
 			})
 
@@ -159,17 +160,17 @@ func generateDownloadCollector() *colly.Collector {
 
 			log.WithFields(log.Fields{
 				"stock": stockID,
-			}).Warnln("no input stock")
+			}).Warnln("無交易資料")
 			success = true
 		} else {
 			log.WithFields(log.Fields{
 				"captcha string": s,
-			}).Infoln("check captcha dismatch")
+			}).Infoln("captcha 不符合")
 		}
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+		log.WithError(err).Warnln("訪問 URL:", r.Request.URL, "失敗")
 		request = false
 	})
 
@@ -180,7 +181,7 @@ func downloadChip(target string) {
 	stockID = target
 	log.WithFields(log.Fields{
 		"stock": stockID,
-	}).Infoln("start downloading process")
+	}).Infoln("開始下載交易籌碼")
 
 	success = false
 	for !success {
@@ -188,7 +189,7 @@ func downloadChip(target string) {
 		c := generateImageCollector()
 		c.Visit("https://bsr.twse.com.tw/bshtm/bsMenu.aspx")
 		if !request {
-			log.Infoln("wait 1 minute")
+			log.Infoln("暫停1分鐘")
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -214,16 +215,16 @@ func downloadChip(target string) {
 		} else {
 			log.WithFields(log.Fields{
 				"captcha string": s,
-			}).Infoln("wrong length of captcha")
+			}).Infoln("錯誤 captcha 長度")
 		}
 
 		if !request {
-			log.Infoln("wait 1 minute")
+			log.Infoln("暫停1分鐘")
 			time.Sleep(time.Minute)
 			continue
 		}
 		if !success {
-			log.Infoln("wait 2 seconds")
+			log.Infoln("暫停2秒")
 			time.Sleep(2 * time.Second)
 		}
 
@@ -245,11 +246,11 @@ func readStockList() {
 		log.WithFields(log.Fields{
 			"url":    r.URL,
 			"method": r.Method,
-		}).Debugln("visit webpage")
+		}).Debugln("訪問")
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+		log.WithError(err).Warnln("訪問 URL:", r.Request.URL, "失敗")
 	})
 
 	c.OnHTML("table.h4 tr td[bgcolor='#FAFAD2']", func(e *colly.HTMLElement) {
@@ -289,7 +290,7 @@ func checkToday() bool {
 		log.WithFields(log.Fields{
 			"url":    r.URL,
 			"method": r.Method,
-		}).Debugln("visit webpage")
+		}).Debugln("訪問")
 	})
 
 	c.OnHTML("span#Label_Date", func(e *colly.HTMLElement) {
@@ -298,17 +299,17 @@ func checkToday() bool {
 			log.WithFields(log.Fields{
 				"date":  date,
 				"today": today,
-			}).Infoln("today data hasn't released")
+			}).Infoln("資料尚未釋出")
 		} else {
 			log.WithFields(log.Fields{
 				"today": today,
-			}).Infoln("today data has released")
+			}).Infoln("資料已釋出")
 			check = true
 		}
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+		log.WithError(err).Warnln("訪問 URL:", r.Request.URL, "失敗")
 	})
 
 	c.Visit("https://bsr.twse.com.tw/bshtm/bsWelcome.aspx")
@@ -326,7 +327,7 @@ func downloadDealerInfo() bool {
 		log.WithFields(log.Fields{
 			"url":    r.URL,
 			"method": r.Method,
-		}).Debugln("visit webpage")
+		}).Debugln("訪問")
 	})
 
 	c.OnHTML("html", func(e *colly.HTMLElement) {
@@ -339,14 +340,14 @@ func downloadDealerInfo() bool {
 				log.Warnln(err)
 				request = false
 			} else {
-				log.Infoln("download dealers info success")
+				log.Infoln("下載股票交易所資料成功")
 			}
 		})
 		c.Visit("https://www.twse.com.tw/brokerService/outPutExcel")
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.WithError(err).Warnln("request URL:", r.Request.URL, "failed")
+		log.WithError(err).Warnln("訪問 URL:", r.Request.URL, "失敗")
 		result = false
 	})
 
@@ -357,20 +358,20 @@ func downloadDealerInfo() bool {
 func createDir() {
 	if _, err := os.Stat("./csv"); os.IsNotExist(err) {
 		if err := os.Mkdir("./csv", 0755); err != nil {
-			log.WithError(err).Fatalln("create folder err")
+			log.WithError(err).Fatalln("建立資料夾失敗")
 		}
 		log.WithFields(log.Fields{
 			"dir": "./csv",
-		}).Infoln("create folder")
+		}).Infoln("建立資料夾")
 	}
 
 	if _, err := os.Stat("./csv/" + today); os.IsNotExist(err) {
 		if err := os.Mkdir("./csv/"+today, 0755); err != nil {
-			log.WithError(err).Fatalln("create folder err")
+			log.WithError(err).Fatalln("建立資料夾失敗")
 		}
 		log.WithFields(log.Fields{
 			"dir": "./csv/" + today,
-		}).Infoln("create folder")
+		}).Infoln("建立資料夾")
 	}
 }
 
@@ -378,18 +379,18 @@ func compressFolder() {
 	path := "./csv/" + today
 	log.WithFields(log.Fields{
 		"file": path + ".tar.zst",
-	}).Infoln("compress data")
+	}).Infoln("壓縮資料")
 
 	cmd := exec.Command("tar", "--exclude", "'.DS_Store'", "--zstd", "-cvf", path+".tar.zst", "-C", "./csv/", today)
 
 	if _, err := cmd.Output(); err != nil {
-		log.WithError(err).Warnln("compress data fail")
+		log.WithError(err).Warnln("壓縮資料失敗")
 	} else {
 		cmd = exec.Command("rm", "-rf", path)
 		cmd.Start()
 		log.WithFields(log.Fields{
 			"file": path + ".tar.zst",
-		}).Infoln("compress data finish")
+		}).Infoln("壓縮資料成功")
 	}
 }
 
@@ -399,64 +400,144 @@ func uncompressFolder(fileName *string) {
 	date := reg.FindString(*fileName)
 	log.WithFields(log.Fields{
 		"dir": "./" + date,
-	}).Infoln("uncompress data")
+	}).Infoln("解壓資料")
 	if _, err := cmd.Output(); err != nil {
-		log.WithError(err).Warnln("uncompress data fail")
+		log.WithError(err).Warnln("解壓資料失敗")
 	} else {
 		log.WithFields(log.Fields{
 			"dir": "./" + date,
-		}).Infoln("uncompress data finish")
+		}).Infoln("解壓資料成功")
 	}
 }
 
-func main() {
-	//         fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
-	//         reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
-	//         firstDate, _ := time.Parse("2006-01-02", "2022-02-08")
-	//         fmt.Println(len(fileList))
-	//         for _, fileName := range fileList {
-	//                 date, _ := time.Parse("2006-01-02", reg.FindString(*fileName))
-	//                 if firstDate.Before(date) || firstDate.Equal(date) {
-	//                         fmt.Println(*fileName)
-	//                         fmt.Println(date)
-	//                         uncompressFolder(fileName)
-	//                         break
-	//                 }
-	//         }
-
-	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
-	slackWebhook.SentMessage("Start to download today stock ship")
-	start := time.Now()
-	today = time.Now().Format("2006-01-02")
+func updateEssentialInformation() {
 	model.InitDBModel("./twstockship.sqlite")
-	if downloadDealerInfo() {
-		dealerreader.ReadDealerXLS("./dealers.xls")
+	request = false
+	for !request {
+		if downloadDealerInfo() {
+			if dealerreader.ReadDealerXLS("./dealers.xls") {
+				request = true
+			} else {
+				log.Infoln("暫停1分鐘")
+				time.Sleep(time.Minute)
+			}
+
+		} else {
+			log.Infoln("暫停1分鐘")
+			time.Sleep(time.Minute)
+		}
 	}
 
 	request = false
 	for !request {
 		readStockList()
 	}
-	log.Infoln("update stocks information success")
+	log.Infoln("更新股票資訊成功")
 
-	for !checkToday() {
-		log.Infoln("wait 1 minute")
-		time.Sleep(time.Minute)
+}
+
+func main() {
+	app := &cli.App{
+		Name:  "twstockship",
+		Usage: "臺灣股市交易籌碼資料下載",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "date",
+				Aliases:     []string{"d"},
+				Usage:       "指定日期 (format 2016-01-02)",
+				Value:       time.Now().Format("2006-01-02"),
+				DefaultText: time.Now().Format("2006-01-02"),
+			},
+			&cli.StringFlag{
+				Name:        "loglevel",
+				Aliases:     []string{"l"},
+				Usage:       "設定log等級 (debug, info, warm, error, fatal, panic)",
+				Value:       "info",
+				DefaultText: "info",
+			},
+		},
+
+		Before: func(c *cli.Context) error {
+			switch c.String("loglevel") {
+			case "debug":
+				log.SetLevel(log.DebugLevel)
+			case "info":
+				log.SetLevel(log.InfoLevel)
+			case "warm":
+				log.SetLevel(log.WarnLevel)
+			case "error":
+				log.SetLevel(log.ErrorLevel)
+			case "fatal":
+				log.SetLevel(log.FatalLevel)
+			case "panic":
+				log.SetLevel(log.PanicLevel)
+			}
+			return nil
+		},
+
+		Commands: []*cli.Command{
+			{
+				Name:    "rebuild",
+				Aliases: []string{"r"},
+				Usage:   "指定日期重新建立資料庫",
+				Action: func(c *cli.Context) error {
+					updateEssentialInformation()
+					fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
+					reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
+					firstDate, _ := time.Parse("2006-01-02", c.String("date"))
+					fmt.Println(len(fileList))
+					for _, fileName := range fileList {
+						fileDate, _ := time.Parse("2006-01-02", reg.FindString(*fileName))
+						if firstDate.Before(fileDate) || firstDate.Equal(fileDate) {
+							fmt.Println(*fileName)
+							fmt.Println(fileDate)
+						}
+					}
+					return nil
+				},
+			},
+			{
+				Name:    "download",
+				Aliases: []string{"d"},
+				Usage:   "下載指定日期交易籌碼 (需交易所網頁釋出)",
+				Action: func(c *cli.Context) error {
+					slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
+					slackWebhook.SentMessage("開始下載今日交易籌碼")
+					start := time.Now()
+					today = c.String("date")
+					updateEssentialInformation()
+					for !checkToday() {
+						log.Infoln("暫停1分鐘")
+						time.Sleep(time.Minute)
+					}
+
+					createDir()
+					for _, s := range stocks {
+						downloadChip(s.id)
+						log.Infoln("暫停2秒")
+						time.Sleep(2 * time.Second)
+					}
+					elapsed := time.Since(start)
+					log.WithFields(log.Fields{
+						"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
+					}).Info("captcha 正確率")
+					log.WithFields(log.Fields{
+						"elapsed": elapsed,
+					}).Printf("程序用時")
+					slackWebhook.SentMessage("下載今日交易籌碼成功")
+					compressFolder()
+
+					return nil
+				},
+			},
+		},
 	}
 
-	createDir()
-	for _, s := range stocks {
-		downloadChip(s.id)
-		log.Infoln("wait 2 seconds")
-		time.Sleep(2 * time.Second)
+	sort.Sort(cli.FlagsByName(app.Flags))
+	sort.Sort(cli.CommandsByName(app.Commands))
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
 	}
-	elapsed := time.Since(start)
-	log.WithFields(log.Fields{
-		"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
-	}).Info("captcha match rate")
-	log.WithFields(log.Fields{
-		"elapsed": elapsed,
-	}).Printf("process took")
-	slackWebhook.SentMessage("Download today stock ship finish")
-	compressFolder()
 }

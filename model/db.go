@@ -15,7 +15,7 @@ func InitDBModel(file string) {
 		Logger: gorm_logrus.New(),
 	})
 	if err != nil {
-		log.WithError(err).Fatalln("failed to connect database")
+		log.WithError(err).Fatalln("連結資料庫失敗")
 	}
 
 	DB.AutoMigrate(&Stock{})

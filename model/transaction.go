@@ -11,7 +11,7 @@ type Transaction struct {
 	gorm.Model
 	StockID  uint `gorm:"not null;index"`
 	Stock    Stock
-	DealerID uint `gorm:"not null"`
+	DealerID uint `gorm:"not null;index"`
 	Dealer   Dealer
 	Date     *string `gorm:"type:date;not null;index`
 	TID      uint    `gorm:"not null"`
@@ -26,14 +26,14 @@ func SmartAddTransaction(stockCode string, dealerCode string, date *string, tid 
 	if err := DB.Where("Code = ?", stockCode).First(&stock).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		log.WithFields(log.Fields{
 			"code": stockCode,
-		}).Errorln("no stock")
+		}).Errorln("無股票記錄")
 		return
 	}
 
 	if err := DB.Where("Code = ?", dealerCode).First(&dealer).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		log.WithFields(log.Fields{
 			"code": stockCode,
-		}).Errorln("no dealer")
+		}).Errorln("無股票交易所記錄")
 		return
 	}
 
@@ -48,12 +48,17 @@ func SmartAddTransaction(stockCode string, dealerCode string, date *string, tid 
 			Sell:     sell,
 		}
 		DB.Save(&transaction)
+		log.WithFields(log.Fields{
+			"stockCode": stockCode,
+			"date":      *date,
+			"tid":       tid,
+		}).Debugln("新增交易")
 	} else {
 		log.WithFields(log.Fields{
 			"stockCode": stockCode,
 			"date":      *date,
 			"tid":       tid,
-		}).Warnln("record has already existed in the DB")
+		}).Warnln("此交易已存在於數據庫中")
 	}
 
 }
