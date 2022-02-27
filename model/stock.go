@@ -19,6 +19,6 @@ func SmartAddStock(code *string, name *string) {
 		log.WithFields(log.Fields{
 			"code": *code,
 			"name": *name,
-		}).Infoln("add stock success")
+		}).Infoln("新增股票")
 	}
 }

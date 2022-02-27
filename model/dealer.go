@@ -19,6 +19,6 @@ func SmartAddDealer(code *string, name *string) {
 		log.WithFields(log.Fields{
 			"code": *code,
 			"name": *name,
-		}).Infoln("add dealer success")
+		}).Infoln("新增股票交易所")
 	}
 }
