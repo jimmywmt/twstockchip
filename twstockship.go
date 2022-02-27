@@ -509,6 +509,7 @@ func main() {
 						dateString := reg.FindString(*fileName)
 						fileDate, _ := time.Parse("2006-01-02", dateString)
 						if firstDate.Before(fileDate) || firstDate.Equal(fileDate) {
+							uncompressFolder(fileName)
 							folder := "./" + dateString
 							csvFileList := gotool.DirRegListFiles(folder, ".*csv$")
 							for _, csvFile := range csvFileList {
