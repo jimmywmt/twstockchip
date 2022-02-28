@@ -515,8 +515,8 @@ func main() {
 							for _, csvFile := range csvFileList {
 								csvNameSlice := strings.Split(*csvFile, "/")
 								nameWithExtension := csvNameSlice[2]
-								sid := nameWithExtension[0 : len(nameWithExtension)-4]
-								csvreader.ReadCSV(*csvFile, sid, dateString)
+								stockCode := nameWithExtension[0 : len(nameWithExtension)-4]
+								csvreader.ReadCSV(*csvFile, stockCode, dateString)
 							}
 							os.RemoveAll(folder)
 						}
@@ -533,7 +533,7 @@ func main() {
 					slackWebhook.SentMessage("開始下載今日交易籌碼")
 					updateEssentialInformation()
 					wg.Add(1)
-					tasks := make(chan string, 2)
+					tasks := make(chan string, 8)
 					go writingRoutine(tasks)
 					start := time.Now()
 					today = c.String("date")
