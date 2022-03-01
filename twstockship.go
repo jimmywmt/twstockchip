@@ -31,7 +31,7 @@ type record struct {
 var imgFile = "CaptchaImage.jpeg"
 
 var stockID, s, evValue, vsValue, vsgValue, today string
-var success, request bool
+var success, request, nodata bool
 var stocks []*record
 var requestImageCount = 0
 var matchCount = 0
@@ -160,6 +160,7 @@ func generateDownloadCollector() *colly.Collector {
 			}
 		} else if result_check == "查無資料" {
 			matchCount++
+			nodata = true
 
 			log.WithFields(log.Fields{
 				"stock": stockID,
@@ -533,7 +534,7 @@ func main() {
 					slackWebhook.SentMessage("開始下載今日交易籌碼")
 					updateEssentialInformation()
 					wg.Add(1)
-					tasks := make(chan string, 8)
+					tasks := make(chan string, 16)
 					go writingRoutine(tasks)
 					start := time.Now()
 					today = c.String("date")
@@ -544,8 +545,11 @@ func main() {
 
 					createDir()
 					for _, s := range stocks {
+						nodata = false
 						downloadChip(s.id)
-						tasks <- s.id
+						if !nodata {
+							tasks <- s.id
+						}
 						log.Infoln("暫停2秒")
 						time.Sleep(2 * time.Second)
 					}

@@ -1,6 +1,8 @@
 package dealerreader
 
 import (
+	"strings"
+
 	"github.com/jimmywmt/gotool"
 	"github.com/jimmywmt/twstockchip/model"
 	"github.com/shakinm/xlsReader/xls"
@@ -19,9 +21,12 @@ func ReadDealerXLS(filepath string) bool {
 			if row, err := sheet.GetRow(i); err == nil {
 				cols := row.GetCols()
 				if len(cols) == 5 {
-					code := gotool.CompressStr(cols[0].GetString())
+					codes := strings.Split(gotool.CompressStr(cols[0].GetString()), "/")
 					name := gotool.CompressStr(cols[1].GetString())
-					model.SmartAddDealer(&code, &name)
+
+					for _, code := range codes {
+						model.SmartAddDealer(&code, &name)
+					}
 
 				}
 			} else {

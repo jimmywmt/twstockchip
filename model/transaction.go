@@ -10,7 +10,7 @@ type Transaction struct {
 	Stock    Stock
 	DealerID uint `gorm:"not null;index"`
 	Dealer   Dealer
-	Date     *string `gorm:"type:date;not null;index`
+	Date     *string `gorm:"type:date;not null;index"`
 	TID      uint    `gorm:"not null"`
 	Price    float64 `gorm:"not null"`
 	Buy      uint    `gorm:"not null"`

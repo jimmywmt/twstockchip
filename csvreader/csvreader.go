@@ -37,13 +37,14 @@ func dealerIDByCode(dealerCode string) uint {
 
 func ReadCSV(filepath string, stockCode string, date string) {
 	data, err := os.OpenFile(filepath, os.O_RDONLY, 0777)
-	trans := make([]model.Transaction, 0, 16)
+	trans := make([]model.Transaction, 0, 512)
 	defer data.Close()
 
 	reg, _ := regexp.Compile("^[a-zA-Z0-9]*")
 
 	if err != nil {
-		log.WithError(err).Errorln("開啓檔案失敗")
+		log.WithError(err).Warningln("開啓檔案失敗")
+		return
 	}
 	reader := csv.NewReader(data)
 
@@ -99,9 +100,9 @@ func ReadCSV(filepath string, stockCode string, date string) {
 				})
 			}
 		}
-		if len(trans) == 16 {
+		if len(trans) == 512 {
 			model.DB.Create(&trans)
-			trans = make([]model.Transaction, 0, 16)
+			trans = make([]model.Transaction, 0, 512)
 		}
 	}
 	if len(trans) != 0 {
