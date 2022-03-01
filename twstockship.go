@@ -413,8 +413,8 @@ func uncompressFolder(fileName *string) {
 	}
 }
 
-func updateEssentialInformation() {
-	model.InitDBModel("./twstockship.sqlite")
+func updateEssentialInformation(dbfile string) {
+	model.InitDBModel(dbfile)
 	request = false
 	for !request {
 		if downloadDealerInfo() {
@@ -458,6 +458,9 @@ func writingRoutine(tasks chan string) {
 
 func main() {
 	runtime.GOMAXPROCS(1)
+	var writedb bool
+	var tasks chan string
+	var dbfile string
 	app := &cli.App{
 		Name:  "twstockship",
 		Usage: "臺灣股市交易籌碼資料下載",
@@ -476,6 +479,19 @@ func main() {
 				Value:       "info",
 				DefaultText: "info",
 			},
+			&cli.BoolFlag{
+				Name:    "nowritedb",
+				Aliases: []string{"n"},
+				Usage:   "不寫入sqlite資料庫",
+				Value:   false,
+			},
+			&cli.StringFlag{
+				Name:        "dbfile",
+				Aliases:     []string{"f"},
+				Usage:       "指定sqlite數據庫檔案",
+				Value:       "./twstockship.sqlite",
+				DefaultText: "./twstockship.sqlite",
+			},
 		},
 
 		Before: func(c *cli.Context) error {
@@ -493,6 +509,8 @@ func main() {
 			case "panic":
 				log.SetLevel(log.PanicLevel)
 			}
+			writedb = !c.Bool("nowritedb")
+			dbfile = c.String("dbfile")
 			return nil
 		},
 
@@ -502,7 +520,7 @@ func main() {
 				Aliases: []string{"r"},
 				Usage:   "指定日期重新建立資料庫",
 				Action: func(c *cli.Context) error {
-					updateEssentialInformation()
+					updateEssentialInformation(dbfile)
 					fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
 					reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
 					firstDate, _ := time.Parse("2006-01-02", c.String("date"))
@@ -532,10 +550,12 @@ func main() {
 				Action: func(c *cli.Context) error {
 					slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 					slackWebhook.SentMessage("開始下載今日交易籌碼")
-					updateEssentialInformation()
-					wg.Add(1)
-					tasks := make(chan string, 16)
-					go writingRoutine(tasks)
+					updateEssentialInformation(dbfile)
+					if writedb {
+						wg.Add(1)
+						tasks = make(chan string, 16)
+						go writingRoutine(tasks)
+					}
 					start := time.Now()
 					today = c.String("date")
 					for !checkToday() {
@@ -547,7 +567,7 @@ func main() {
 					for _, s := range stocks {
 						nodata = false
 						downloadChip(s.id)
-						if !nodata {
+						if !nodata && writedb {
 							tasks <- s.id
 						}
 						log.Infoln("暫停2秒")
@@ -562,7 +582,9 @@ func main() {
 						"elapsed": elapsed,
 					}).Printf("程序用時")
 					slackWebhook.SentMessage("下載今日交易籌碼成功")
-					wg.Wait()
+					if writedb {
+						wg.Wait()
+					}
 					compressFolder()
 
 					return nil
