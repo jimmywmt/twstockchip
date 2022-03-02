@@ -30,7 +30,7 @@ type record struct {
 
 var imgFile = "CaptchaImage.jpeg"
 
-var stockID, s, evValue, vsValue, vsgValue, today string
+var stockCode, s, evValue, vsValue, vsgValue, today string
 var success, request, nodata bool
 var stocks []*record
 var requestImageCount = 0
@@ -140,14 +140,14 @@ func generateDownloadCollector() *colly.Collector {
 			c.OnResponse(func(r *colly.Response) {
 				reader := bytes.NewReader(r.Body)
 				body, _ := ioutil.ReadAll(reader)
-				err := ioutil.WriteFile("./csv/"+today+"/"+stockID+".csv", body, 0755)
+				err := ioutil.WriteFile("./csv/"+today+"/"+stockCode+".csv", body, 0755)
 
 				if err != nil {
 					log.Warnln(err)
 					request = false
 				} else {
 					log.WithFields(log.Fields{
-						"stock": stockID,
+						"stockCode": stockCode,
 					}).Infoln("下載交易籌碼檔案成功")
 				}
 			})
@@ -163,7 +163,7 @@ func generateDownloadCollector() *colly.Collector {
 			nodata = true
 
 			log.WithFields(log.Fields{
-				"stock": stockID,
+				"stockCode": stockCode,
 			}).Warnln("無交易資料")
 			success = true
 		} else {
@@ -182,9 +182,9 @@ func generateDownloadCollector() *colly.Collector {
 }
 
 func downloadChip(target string) {
-	stockID = target
+	stockCode = target
 	log.WithFields(log.Fields{
-		"stock": stockID,
+		"stockCode": stockCode,
 	}).Infoln("開始下載交易籌碼")
 
 	success = false
@@ -206,7 +206,7 @@ func downloadChip(target string) {
 			"__VIEWSTATEGENERATOR": vsgValue,
 			"__EVENTVALIDATION":    evValue,
 			"RadioButton_Normal":   "RadioButton_Normal",
-			"TextBox_Stkno":        stockID,
+			"TextBox_Stkno":        stockCode,
 			"CaptchaControl1":      s,
 			"btnOK":                "查詢",
 		}
@@ -448,7 +448,8 @@ func writingRoutine(tasks chan string) {
 		task = <-tasks
 		switch task {
 		case "close":
-			break
+			log.Infoln("寫入routine結束")
+			return
 		default:
 			fileName := dir + task + ".csv"
 			csvreader.ReadCSV(fileName, task, today)
@@ -461,9 +462,17 @@ func main() {
 	var writedb bool
 	var tasks chan string
 	var dbfile string
+
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"v"},
+		Usage:   "顯示版本",
+	}
+
 	app := &cli.App{
-		Name:  "twstockship",
-		Usage: "臺灣股市交易籌碼資料下載",
+		Name:    "twstockship",
+		Usage:   "臺灣股市交易籌碼資料下載",
+		Version: "v1.0.0",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "date",
@@ -534,8 +543,8 @@ func main() {
 							for _, csvFile := range csvFileList {
 								csvNameSlice := strings.Split(*csvFile, "/")
 								nameWithExtension := csvNameSlice[2]
-								stockCode := nameWithExtension[0 : len(nameWithExtension)-4]
-								csvreader.ReadCSV(*csvFile, stockCode, dateString)
+								code := nameWithExtension[0 : len(nameWithExtension)-4]
+								csvreader.ReadCSV(*csvFile, code, dateString)
 							}
 							os.RemoveAll(folder)
 						}
@@ -556,7 +565,6 @@ func main() {
 						tasks = make(chan string, 16)
 						go writingRoutine(tasks)
 					}
-					start := time.Now()
 					today = c.String("date")
 					for !checkToday() {
 						log.Infoln("暫停1分鐘")
@@ -564,6 +572,7 @@ func main() {
 					}
 
 					createDir()
+					start := time.Now()
 					for _, s := range stocks {
 						nodata = false
 						downloadChip(s.id)
@@ -573,19 +582,20 @@ func main() {
 						log.Infoln("暫停2秒")
 						time.Sleep(2 * time.Second)
 					}
-					tasks <- "close"
 					elapsed := time.Since(start)
 					log.WithFields(log.Fields{
 						"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
 					}).Info("captcha 正確率")
 					log.WithFields(log.Fields{
 						"elapsed": elapsed,
-					}).Printf("程序用時")
+					}).Printf("下載用時")
 					slackWebhook.SentMessage("下載今日交易籌碼成功")
+					tasks <- "close"
 					if writedb {
 						wg.Wait()
 					}
 					compressFolder()
+					slackWebhook.SentMessage("歸檔今日交易籌碼成功")
 
 					return nil
 				},

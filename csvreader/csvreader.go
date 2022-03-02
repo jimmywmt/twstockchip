@@ -108,4 +108,8 @@ func ReadCSV(filepath string, stockCode string, date string) {
 	if len(trans) != 0 {
 		model.DB.Create(&trans)
 	}
+	log.WithFields(log.Fields{
+		"stockCode": stockCode,
+		"date":      date,
+	}).Infoln("輸入籌碼資訊完成")
 }
