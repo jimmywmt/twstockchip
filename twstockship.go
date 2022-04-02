@@ -1,11 +1,14 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"image"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -18,6 +21,7 @@ import (
 	"github.com/jimmywmt/twstockchip/csvreader"
 	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
+	"github.com/klauspost/compress/zstd"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gocv.io/x/gocv"
@@ -181,8 +185,8 @@ func generateDownloadCollector() *colly.Collector {
 	return c
 }
 
-func downloadChip(target string) {
-	stockCode = target
+func downloadChip(target *string) {
+	stockCode = *target
 	log.WithFields(log.Fields{
 		"stockCode": stockCode,
 	}).Infoln("開始下載交易籌碼")
@@ -379,17 +383,71 @@ func createDir() {
 	}
 }
 
+func compress(src *string, buf io.Writer) error {
+	// tar > zstd > buf
+	zr, _ := zstd.NewWriter(buf, zstd.WithEncoderLevel(zstd.SpeedBestCompression))
+	tw := tar.NewWriter(zr)
+
+	// walk through every file in the folder
+	filepath.Walk(*src, func(file string, fi os.FileInfo, err error) error {
+		// generate tar header
+		header, err := tar.FileInfoHeader(fi, file)
+		if err != nil {
+			return err
+		}
+
+		// must provide real name
+		// (see https://golang.org/src/archive/tar/common.go?#L626)
+		//                 fmt.Println(filepath.ToSlash(file))
+		//                 header.Name = filepath.ToSlash(file)
+		header.Name = strings.TrimPrefix(file, "csv/")
+
+		// write header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		// if not a dir, write file content
+		if !fi.IsDir() {
+			data, err := os.Open("./" + file)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(tw, data); err != nil {
+				return err
+			}
+			data.Close()
+		}
+		return nil
+	})
+
+	// produce tar
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	// produce zstd
+	if err := zr.Close(); err != nil {
+		return err
+	}
+	//
+	return nil
+}
+
 func compressFolder() {
-	path := "./csv/" + today
-	log.WithFields(log.Fields{
-		"file": path + ".tar.zst",
-	}).Infoln("壓縮資料")
-
-	cmd := exec.Command("tar", "--exclude='.[^/]*'", "--zstd", "-cvf", path+".tar.zst", "-C", "./csv/", today)
-
-	if _, err := cmd.Output(); err != nil {
+	path := "csv/" + today
+	zstdFile := path + ".tar.zst"
+	var buf bytes.Buffer
+	err := compress(&path, &buf)
+	if err != nil {
 		log.WithError(err).Warnln("壓縮資料失敗")
 	} else {
+		fileToWrite, err := os.OpenFile(zstdFile, os.O_CREATE|os.O_RDWR, os.FileMode(0644))
+		if err != nil {
+			panic(err)
+		}
+		if _, err := io.Copy(fileToWrite, &buf); err != nil {
+			panic(err)
+		}
+		fileToWrite.Close()
 		os.RemoveAll(path)
 		log.WithFields(log.Fields{
 			"file": path + ".tar.zst",
@@ -397,24 +455,63 @@ func compressFolder() {
 	}
 }
 
+func uncompress(src io.Reader) error {
+	zr, err := zstd.NewReader(src)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(zr)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		target := filepath.Join(header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+		case tar.TypeReg:
+			fileToWrite, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(fileToWrite, tr); err != nil {
+				return err
+			}
+			fileToWrite.Close()
+		}
+	}
+
+	return nil
+}
+
 func uncompressFolder(fileName *string) {
-	cmd := exec.Command("tar", "xvf", *fileName)
 	reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
 	date := reg.FindString(*fileName)
 	log.WithFields(log.Fields{
 		"dir": "./" + date,
 	}).Infoln("解壓資料")
-	if _, err := cmd.Output(); err != nil {
+	file, err := os.Open(*fileName)
+	if err != nil {
 		log.WithError(err).Warnln("解壓資料失敗")
-	} else {
-		log.WithFields(log.Fields{
-			"dir": "./" + date,
-		}).Infoln("解壓資料成功")
+	}
+	err = uncompress(file)
+	if err != nil {
+		log.WithError(err).Warnln("解壓資料失敗")
 	}
 }
 
-func updateEssentialInformation(dbfile string) {
-	model.InitDBModel(dbfile)
+func updateEssentialInformation(dbfile *string) {
+	model.InitDBModel(*dbfile)
 	request = false
 	for !request {
 		if downloadDealerInfo() {
@@ -459,6 +556,7 @@ func writingRoutine(tasks chan string) {
 
 func main() {
 	runtime.GOMAXPROCS(1)
+	const version = "v1.1.0"
 	var writedb bool
 	var tasks chan string
 	var dbfile string
@@ -472,7 +570,7 @@ func main() {
 	app := &cli.App{
 		Name:    "twstockship",
 		Usage:   "臺灣股市交易籌碼資料下載",
-		Version: "v1.0.0",
+		Version: version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "date",
@@ -529,7 +627,7 @@ func main() {
 				Aliases: []string{"r"},
 				Usage:   "指定日期重新建立資料庫",
 				Action: func(c *cli.Context) error {
-					updateEssentialInformation(dbfile)
+					updateEssentialInformation(&dbfile)
 					fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
 					reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
 					firstDate, _ := time.Parse("2006-01-02", c.String("date"))
@@ -559,7 +657,7 @@ func main() {
 				Action: func(c *cli.Context) error {
 					slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 					slackWebhook.SentMessage("開始下載今日交易籌碼")
-					updateEssentialInformation(dbfile)
+					updateEssentialInformation(&dbfile)
 					if writedb {
 						wg.Add(1)
 						tasks = make(chan string, 16)
@@ -575,7 +673,7 @@ func main() {
 					start := time.Now()
 					for _, s := range stocks {
 						nodata = false
-						downloadChip(s.id)
+						downloadChip(&s.id)
 						if !nodata && writedb {
 							tasks <- s.id
 						}
@@ -600,6 +698,16 @@ func main() {
 					return nil
 				},
 			},
+			//                         {
+			//                                 Name:    "test",
+			//                                 Aliases: []string{"t"},
+			//                                 Usage:   "TEST",
+			//                                 Action: func(c *cli.Context) error {
+			//                                         today = "csv/2022-03-01.tar.zst"
+			//                                         uncompressFolder(&today)
+			//                                         return nil
+			//                                 },
+			//                         },
 		},
 	}
 
