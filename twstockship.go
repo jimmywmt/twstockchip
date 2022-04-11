@@ -688,8 +688,8 @@ func main() {
 						"elapsed": elapsed,
 					}).Printf("下載用時")
 					slackWebhook.SentMessage("下載今日交易籌碼成功")
-					tasks <- "close"
 					if writedb {
+						tasks <- "close"
 						wg.Wait()
 					}
 					compressFolder()
