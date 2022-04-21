@@ -656,18 +656,28 @@ func main() {
 				Usage:   "下載指定日期交易籌碼 (需交易所網頁釋出)",
 				Action: func(c *cli.Context) error {
 					slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
-					slackWebhook.SentMessage("開始下載今日交易籌碼")
 					updateEssentialInformation(&dbfile)
 					if writedb {
 						wg.Add(1)
 						tasks = make(chan string, 16)
 						go writingRoutine(tasks)
 					}
+
 					today = c.String("date")
+
+					count := 0
 					for !checkToday() {
 						log.Infoln("暫停1分鐘")
 						time.Sleep(time.Minute)
+						count++
+
+						if count == 10 {
+							slackWebhook.SentMessage("今日無交易")
+							return nil
+						}
 					}
+
+					slackWebhook.SentMessage("開始下載今日交易籌碼")
 
 					createDir()
 					start := time.Now()
