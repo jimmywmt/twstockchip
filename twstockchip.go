@@ -568,7 +568,7 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name:    "twstockship",
+		Name:    "twstockchip",
 		Usage:   "臺灣股市交易籌碼資料下載",
 		Version: version,
 		Flags: []cli.Flag{
@@ -596,8 +596,8 @@ func main() {
 				Name:        "dbfile",
 				Aliases:     []string{"f"},
 				Usage:       "指定sqlite數據庫檔案",
-				Value:       "./twstockship.sqlite",
-				DefaultText: "./twstockship.sqlite",
+				Value:       "./twstockchip.sqlite",
+				DefaultText: "./twstockchip.sqlite",
 			},
 		},
 
