@@ -578,7 +578,7 @@ func writingRoutine(tasks chan string) {
 
 func main() {
 	runtime.GOMAXPROCS(1)
-	const version = "v1.1.0"
+	const version = "v1.1.1"
 	var writedb bool
 	var tasks chan string
 	var dbfile string
