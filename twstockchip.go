@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"image"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -76,8 +75,8 @@ func generateImageCollector() *colly.Collector {
 
 		c.OnResponse(func(r *colly.Response) {
 			reader := bytes.NewReader(r.Body)
-			body, _ := ioutil.ReadAll(reader)
-			err := ioutil.WriteFile(imgFile, body, 0755)
+			body, _ := io.ReadAll(reader)
+			err := os.WriteFile(imgFile, body, 0755)
 
 			if err != nil {
 				log.WithError(err).Warnln("連接失敗")
@@ -153,8 +152,8 @@ func generateDownloadCollector() *colly.Collector {
 
 			c.OnResponse(func(r *colly.Response) {
 				reader := bytes.NewReader(r.Body)
-				body, _ := ioutil.ReadAll(reader)
-				err := ioutil.WriteFile("./csv/"+today+"/"+stockCode+".csv", body, 0755)
+				body, _ := io.ReadAll(reader)
+				err := os.WriteFile("./csv/"+today+"/"+stockCode+".csv", body, 0755)
 
 				if err != nil {
 					log.Warnln(err)
@@ -363,8 +362,8 @@ func downloadDealerInfo() bool {
 	c.OnHTML("html", func(e *colly.HTMLElement) {
 		c.OnResponse(func(r *colly.Response) {
 			reader := bytes.NewReader(r.Body)
-			body, _ := ioutil.ReadAll(reader)
-			err := ioutil.WriteFile("./dealers.xls", body, 0755)
+			body, _ := io.ReadAll(reader)
+			err := os.WriteFile("./dealers.xls", body, 0755)
 
 			if err != nil {
 				log.Warnln(err)
@@ -373,7 +372,7 @@ func downloadDealerInfo() bool {
 				log.Infoln("下載股票交易所資料成功")
 			}
 		})
-		c.Visit("https://www.twse.com.tw/brokerService/outPutExcel")
+		c.Visit("https://www.twse.com.tw/rwd/zh/brokerService/outPutExcel")
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
@@ -576,9 +575,93 @@ func writingRoutine(tasks chan string) {
 	}
 }
 
+func ScheduleTask(hour, minute, second int, task func()) {
+	go func() {
+		for {
+			// Get the current time
+			now := time.Now()
+
+			// Calculate the next scheduled time
+			nextRun := time.Date(
+				now.Year(),
+				now.Month(),
+				now.Day(),
+				hour,
+				minute,
+				second,
+				0,
+				now.Location(),
+			)
+
+			// If the next scheduled time is in the past, schedule for the next day
+			if nextRun.Before(now) {
+				nextRun = nextRun.Add(24 * time.Hour)
+			}
+
+			// Wait until the next scheduled time
+			time.Sleep(time.Until(nextRun))
+
+			// Execute the task
+			task()
+		}
+	}()
+}
+
+func downloadRutine(dbfile string, writedb bool, tasks chan string, date string) {
+	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
+	updateEssentialInformation(&dbfile)
+	if writedb {
+		wg.Add(1)
+		tasks = make(chan string, 16)
+		go writingRoutine(tasks)
+	}
+
+	today = date
+
+	count := 0
+	for !checkToday() {
+		log.Infoln("暫停1分鐘")
+		time.Sleep(time.Minute)
+		count++
+
+		if count == 10 {
+			slackWebhook.SentMessage("今日無交易")
+			return
+		}
+	}
+
+	slackWebhook.SentMessage("開始下載今日交易籌碼")
+
+	createDir()
+	start := time.Now()
+	for _, s := range stocks {
+		nodata = false
+		downloadChip(&s.id)
+		if !nodata && writedb {
+			tasks <- s.id
+		}
+		log.Infoln("暫停2秒")
+		time.Sleep(2 * time.Second)
+	}
+	elapsed := time.Since(start)
+	log.WithFields(log.Fields{
+		"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
+	}).Info("captcha 正確率")
+	log.WithFields(log.Fields{
+		"elapsed": elapsed,
+	}).Printf("下載用時")
+	slackWebhook.SentMessage("下載今日交易籌碼成功")
+	if writedb {
+		tasks <- "close"
+		wg.Wait()
+	}
+	compressFolder()
+	slackWebhook.SentMessage("歸檔今日交易籌碼成功")
+}
+
 func main() {
-	runtime.GOMAXPROCS(1)
-	const version = "v1.1.1"
+	runtime.GOMAXPROCS(2)
+	const version = "v2.0.0"
 	var writedb bool
 	var tasks chan string
 	var dbfile string
@@ -677,56 +760,19 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "下載指定日期交易籌碼 (需交易所網頁釋出)",
 				Action: func(c *cli.Context) error {
-					slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
-					updateEssentialInformation(&dbfile)
-					if writedb {
-						wg.Add(1)
-						tasks = make(chan string, 16)
-						go writingRoutine(tasks)
-					}
-
-					today = c.String("date")
-
-					count := 0
-					for !checkToday() {
-						log.Infoln("暫停1分鐘")
-						time.Sleep(time.Minute)
-						count++
-
-						if count == 10 {
-							slackWebhook.SentMessage("今日無交易")
-							return nil
-						}
-					}
-
-					slackWebhook.SentMessage("開始下載今日交易籌碼")
-
-					createDir()
-					start := time.Now()
-					for _, s := range stocks {
-						nodata = false
-						downloadChip(&s.id)
-						if !nodata && writedb {
-							tasks <- s.id
-						}
-						log.Infoln("暫停2秒")
-						time.Sleep(2 * time.Second)
-					}
-					elapsed := time.Since(start)
-					log.WithFields(log.Fields{
-						"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
-					}).Info("captcha 正確率")
-					log.WithFields(log.Fields{
-						"elapsed": elapsed,
-					}).Printf("下載用時")
-					slackWebhook.SentMessage("下載今日交易籌碼成功")
-					if writedb {
-						tasks <- "close"
-						wg.Wait()
-					}
-					compressFolder()
-					slackWebhook.SentMessage("歸檔今日交易籌碼成功")
-
+					downloadRutine(dbfile, writedb, tasks, c.String("date"))
+					return nil
+				},
+			},
+			{
+				Name:    "daemon",
+				Aliases: []string{"D"},
+				Usage:   "每日自動下載交易籌碼",
+				Action: func(c *cli.Context) error {
+					log.Infoln("啟動每日自動下載交易籌碼服務")
+					ScheduleTask(16, 30, 0, func() {
+						downloadRutine(dbfile, writedb, tasks, time.Now().Format("2006-01-02"))
+					})
 					return nil
 				},
 			},
