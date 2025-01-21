@@ -3,6 +3,7 @@ module github.com/jimmywmt/twstockchip
 go 1.21
 
 require (
+	github.com/disintegration/imaging v1.6.2
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/jimmywmt/gotool v0.0.0-20220225040019-f0e8f08908cc
 	github.com/klauspost/compress v1.17.7
@@ -34,6 +35,7 @@ require (
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20231213231151-1d8dd44e695e // indirect
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

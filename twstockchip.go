@@ -4,7 +4,9 @@ import (
 	"archive/tar"
 	"bytes"
 	"crypto/tls"
-	"image"
+	"fmt"
+
+	// "image"
 	"io"
 	"net/http"
 	"os"
@@ -22,10 +24,11 @@ import (
 	"github.com/jimmywmt/twstockchip/csvreader"
 	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
+	"github.com/jimmywmt/twstockchip/tool"
 	"github.com/klauspost/compress/zstd"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"gocv.io/x/gocv"
+	// "gocv.io/x/gocv"
 )
 
 type record struct {
@@ -90,22 +93,17 @@ func generateImageCollector() *colly.Collector {
 
 		if request {
 			requestImageCount++
-			img := gocv.IMRead(imgFile, gocv.IMReadColor)
-			kernel := gocv.GetStructuringElement(gocv.MorphRect, image.Pt(3, 3))
-			gocv.Erode(img, &img, kernel)
-			gocv.Dilate(img, &img, kernel)
-			nimg := gocv.NewMat()
-			gocv.BilateralFilter(img, &nimg, 35, 35, 6)
-			gocv.MedianBlur(nimg, &img, 5)
-			gocv.MedianBlur(img, &nimg, 5)
-			img = nimg.Region(image.Rect(0, int(float64(nimg.Rows())*0.1), nimg.Cols(), int(float64(nimg.Rows())*0.8)))
-			gocv.Threshold(img, &nimg, 180, 255, gocv.ThresholdBinary)
-			gocv.IMWrite("img.jpeg", nimg)
 
-			cmd := exec.Command("tesseract", "img.jpeg", "stdout", "--psm", "13", "--oem", "0", "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+			err := tool.ProcessImage(imgFile, "img.jpeg")
+			if err != nil {
+				fmt.Println("Error processing image:", err)
+				return
+			}
+
+			cmd := exec.Command("tesseract", "img.jpeg", "stdout", "--psm", "7", "--oem", "1", "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
 			out, _ := cmd.Output()
 			s = gotool.CompressStr(string(out))
-
 		}
 	})
 
@@ -607,6 +605,44 @@ func ScheduleTask(hour, minute, second int, task func()) {
 	}()
 }
 
+// ScheduleTaskWithSkipWeekends schedules a task to run at a specific time every weekday
+func ScheduleTaskWithSkipWeekends(hour, minute, second int, task func()) {
+	go func() {
+		for {
+			// Get the current time
+			now := time.Now()
+
+			// Calculate the next scheduled time
+			nextRun := time.Date(
+				now.Year(),
+				now.Month(),
+				now.Day(),
+				hour,
+				minute,
+				second,
+				0,
+				now.Location(),
+			)
+
+			// If the next scheduled time is in the past, schedule for the next day
+			if nextRun.Before(now) {
+				nextRun = nextRun.Add(24 * time.Hour)
+			}
+
+			// Skip weekends (Saturday and Sunday)
+			for nextRun.Weekday() == time.Saturday || nextRun.Weekday() == time.Sunday {
+				nextRun = nextRun.Add(24 * time.Hour)
+			}
+
+			// Wait until the next scheduled time
+			time.Sleep(time.Until(nextRun))
+
+			// Execute the task
+			task()
+		}
+	}()
+}
+
 func downloadRutine(dbfile string, writedb bool, tasks chan string, date string) {
 	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 	updateEssentialInformation(&dbfile)
@@ -661,7 +697,7 @@ func downloadRutine(dbfile string, writedb bool, tasks chan string, date string)
 
 func main() {
 	runtime.GOMAXPROCS(2)
-	const version = "v2.0.0"
+	const version = "v2.3.0"
 	var writedb bool
 	var tasks chan string
 	var dbfile string
@@ -770,7 +806,9 @@ func main() {
 				Usage:   "每日自動下載交易籌碼",
 				Action: func(c *cli.Context) error {
 					log.Infoln("啟動每日自動下載交易籌碼服務")
-					ScheduleTask(16, 30, 0, func() {
+					ScheduleTaskWithSkipWeekends(16, 30, 0, func() {
+						requestImageCount = 0
+						matchCount = 0
 						downloadRutine(dbfile, writedb, tasks, time.Now().Format("2006-01-02"))
 					})
 					// Keep the main function running
@@ -778,16 +816,6 @@ func main() {
 					return nil
 				},
 			},
-			//                         {
-			//                                 Name:    "test",
-			//                                 Aliases: []string{"t"},
-			//                                 Usage:   "TEST",
-			//                                 Action: func(c *cli.Context) error {
-			//                                         today = "csv/2022-03-01.tar.zst"
-			//                                         uncompressFolder(&today)
-			//                                         return nil
-			//                                 },
-			//                         },
 		},
 	}
 
