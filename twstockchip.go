@@ -773,6 +773,8 @@ func main() {
 					ScheduleTask(16, 30, 0, func() {
 						downloadRutine(dbfile, writedb, tasks, time.Now().Format("2006-01-02"))
 					})
+					// Keep the main function running
+					select {}
 					return nil
 				},
 			},
