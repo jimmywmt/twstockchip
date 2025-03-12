@@ -1,17 +1,13 @@
 package main
 
 import (
-	"archive/tar"
 	"bytes"
 	"crypto/tls"
 	"fmt"
-
-	// "image"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -21,14 +17,14 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jimmywmt/gotool"
+	"github.com/jimmywmt/twstockchip/config"
 	"github.com/jimmywmt/twstockchip/csvreader"
 	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
 	"github.com/jimmywmt/twstockchip/tool"
-	"github.com/klauspost/compress/zstd"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	// "gocv.io/x/gocv"
+	"golang.org/x/exp/rand"
 )
 
 type record struct {
@@ -36,18 +32,20 @@ type record struct {
 	name string
 }
 
-var imgFile = "CaptchaImage.jpeg"
+var imgFile = "captchaimage.jpeg"
 
-var stockCode, s, evValue, vsValue, vsgValue, today string
-var success, request, nodata bool
-var stocks []*record
-var requestImageCount = 0
-var matchCount = 0
-var slackWebhookURL = "https://hooks.slack.com/services/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"
+var (
+	stockCode, s, evValue, vsValue, vsgValue, today string
+	success, request, nodata                        bool
+	stocks                                          []*record
+	requestImageCount                               = 0
+	matchCount                                      = 0
+)
+
+// var slackwebhookurl = "https://hooks.slack.com/services/t1w9v7r3r/b032t7g6na2/zpij5nj9upufqvrgtgweb2ft"
 var wg sync.WaitGroup
 
 func init() {
-
 	log.SetFormatter(&log.TextFormatter{
 		ForceQuote:      true,
 		TimestampFormat: "2006-01-02 15:04:05",
@@ -59,7 +57,7 @@ func init() {
 
 func generateImageCollector() *colly.Collector {
 	c := colly.NewCollector(
-		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edge/44.18363.8131"),
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/131.0.2903.86"),
 	)
 
 	c.WithTransport(&http.Transport{
@@ -68,9 +66,13 @@ func generateImageCollector() *colly.Collector {
 
 	c.OnRequest(func(r *colly.Request) {
 		log.WithFields(log.Fields{
-			"url":    r.URL,
-			"method": r.Method,
+			"URL":    r.URL,
+			"Method": r.Method,
 		}).Debugln("訪問")
+		r.Headers.Set("Sec-CH-UA", `"Chromium";v="132", "Microsoft Edge";v="131", "Not=A?Brand";v="99"`)
+		r.Headers.Set("Sec-CH-UA-Mobile", "?0")          // 是否為行動裝置
+		r.Headers.Set("Sec-CH-UA-Platform", `"Windows"`) // 作業系統
+		r.Headers.Set("Sec-CH-UA-Platform-Version", `"10.0.0"`)
 	})
 
 	c.OnHTML("img[border='0']", func(e *colly.HTMLElement) {
@@ -79,17 +81,21 @@ func generateImageCollector() *colly.Collector {
 		c.OnResponse(func(r *colly.Response) {
 			reader := bytes.NewReader(r.Body)
 			body, _ := io.ReadAll(reader)
-			err := os.WriteFile(imgFile, body, 0755)
+			err := os.WriteFile(imgFile, body, 0o755)
 
 			if err != nil {
 				log.WithError(err).Warnln("連接失敗")
 				request = false
 			} else {
-				log.Infoln("下載 captcha 圖片成功")
+				log.Infoln("下載 CAPTCHA 圖片成功")
 			}
 		})
 
-		c.Visit(img_addr)
+		err := c.Visit(img_addr)
+		if err != nil {
+			log.WithError(err).Warnln("訪問 CAPTCHA 圖片失敗")
+			request = false
+		}
 
 		if request {
 			requestImageCount++
@@ -151,7 +157,7 @@ func generateDownloadCollector() *colly.Collector {
 			c.OnResponse(func(r *colly.Response) {
 				reader := bytes.NewReader(r.Body)
 				body, _ := io.ReadAll(reader)
-				err := os.WriteFile("./csv/"+today+"/"+stockCode+".csv", body, 0755)
+				err := os.WriteFile("./csv/"+today+"/"+stockCode+".csv", body, 0o755)
 
 				if err != nil {
 					log.Warnln(err)
@@ -167,7 +173,6 @@ func generateDownloadCollector() *colly.Collector {
 
 			if request {
 				success = true
-
 			}
 		} else if result_check == "查無資料" {
 			matchCount++
@@ -179,8 +184,8 @@ func generateDownloadCollector() *colly.Collector {
 			success = true
 		} else {
 			log.WithFields(log.Fields{
-				"captcha string": s,
-			}).Infoln("captcha 不符合")
+				"CAPTCHA string": s,
+			}).Infoln("CAPTCHA 不符合")
 		}
 	})
 
@@ -209,7 +214,7 @@ func downloadChip(target *string) {
 			continue
 		}
 
-		var formData = map[string]string{
+		formData := map[string]string{
 			"__EVENTTARGET":        "",
 			"__EVENTARGUMENT":      "",
 			"__LASTFOCUS:":         "",
@@ -229,8 +234,8 @@ func downloadChip(target *string) {
 			c2.Post("https://bsr.twse.com.tw/bshtm/bsMenu.aspx", formData)
 		} else {
 			log.WithFields(log.Fields{
-				"captcha string": s,
-			}).Infoln("錯誤 captcha 長度")
+				"CAPTCHA string": s,
+			}).Infoln("錯誤 CAPTCHA 長度")
 		}
 
 		if !request {
@@ -239,8 +244,8 @@ func downloadChip(target *string) {
 			continue
 		}
 		if !success {
-			log.Infoln("暫停2秒")
-			time.Sleep(2 * time.Second)
+			log.Infoln("暫停1~5秒")
+			time.Sleep(time.Duration(1+rand.Intn(5)) * time.Second)
 		}
 
 	}
@@ -280,7 +285,7 @@ func readStockList() {
 			} else {
 				status = false
 			}
-		} else if status == true {
+		} else if status {
 			data := string(e.Text)
 			idName := strings.Split(data, "\u3000")
 			if len(idName) > 1 {
@@ -361,7 +366,7 @@ func downloadDealerInfo() bool {
 		c.OnResponse(func(r *colly.Response) {
 			reader := bytes.NewReader(r.Body)
 			body, _ := io.ReadAll(reader)
-			err := os.WriteFile("./dealers.xls", body, 0755)
+			err := os.WriteFile("./dealers.xls", body, 0o755)
 
 			if err != nil {
 				log.Warnln(err)
@@ -384,7 +389,7 @@ func downloadDealerInfo() bool {
 
 func createDir() {
 	if _, err := os.Stat("./csv"); os.IsNotExist(err) {
-		if err := os.Mkdir("./csv", 0755); err != nil {
+		if err := os.Mkdir("./csv", 0o755); err != nil {
 			log.WithError(err).Fatalln("建立資料夾失敗")
 		}
 		log.WithFields(log.Fields{
@@ -393,7 +398,7 @@ func createDir() {
 	}
 
 	if _, err := os.Stat("./csv/" + today); os.IsNotExist(err) {
-		if err := os.Mkdir("./csv/"+today, 0755); err != nil {
+		if err := os.Mkdir("./csv/"+today, 0o755); err != nil {
 			log.WithError(err).Fatalln("建立資料夾失敗")
 		}
 		log.WithFields(log.Fields{
@@ -402,135 +407,9 @@ func createDir() {
 	}
 }
 
-func compress(src *string, buf io.Writer) error {
-	// tar > zstd > buf
-	zr, _ := zstd.NewWriter(buf, zstd.WithEncoderLevel(zstd.SpeedBestCompression))
-	tw := tar.NewWriter(zr)
+func updateEssentialInformation(sqlitefile string, postgresDSN string) {
+	model.InitDBModel(sqlitefile, postgresDSN)
 
-	// walk through every file in the folder
-	filepath.Walk(*src, func(file string, fi os.FileInfo, err error) error {
-		// generate tar header
-		header, err := tar.FileInfoHeader(fi, file)
-		if err != nil {
-			return err
-		}
-
-		// must provide real name
-		// (see https://golang.org/src/archive/tar/common.go?#L626)
-		//                 fmt.Println(filepath.ToSlash(file))
-		//                 header.Name = filepath.ToSlash(file)
-		header.Name = strings.TrimPrefix(file, "csv/")
-
-		// write header
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-		// if not a dir, write file content
-		if !fi.IsDir() {
-			data, err := os.Open("./" + file)
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(tw, data); err != nil {
-				return err
-			}
-			data.Close()
-		}
-		return nil
-	})
-
-	// produce tar
-	if err := tw.Close(); err != nil {
-		return err
-	}
-	// produce zstd
-	if err := zr.Close(); err != nil {
-		return err
-	}
-	//
-	return nil
-}
-
-func compressFolder() {
-	path := "csv/" + today
-	zstdFile := path + ".tar.zst"
-	var buf bytes.Buffer
-	err := compress(&path, &buf)
-	if err != nil {
-		log.WithError(err).Warnln("壓縮資料失敗")
-	} else {
-		fileToWrite, err := os.OpenFile(zstdFile, os.O_CREATE|os.O_RDWR, os.FileMode(0644))
-		if err != nil {
-			panic(err)
-		}
-		if _, err := io.Copy(fileToWrite, &buf); err != nil {
-			panic(err)
-		}
-		fileToWrite.Close()
-		os.RemoveAll(path)
-		log.WithFields(log.Fields{
-			"file": path + ".tar.zst",
-		}).Infoln("壓縮資料成功")
-	}
-}
-
-func uncompress(src io.Reader) error {
-	zr, err := zstd.NewReader(src)
-	if err != nil {
-		return err
-	}
-	tr := tar.NewReader(zr)
-
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-
-		target := filepath.Join(header.Name)
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
-					return err
-				}
-			}
-		case tar.TypeReg:
-			fileToWrite, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(fileToWrite, tr); err != nil {
-				return err
-			}
-			fileToWrite.Close()
-		}
-	}
-
-	return nil
-}
-
-func uncompressFolder(fileName *string) {
-	reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
-	date := reg.FindString(*fileName)
-	log.WithFields(log.Fields{
-		"dir": "./" + date,
-	}).Infoln("解壓資料")
-	file, err := os.Open(*fileName)
-	if err != nil {
-		log.WithError(err).Warnln("解壓資料失敗")
-	}
-	err = uncompress(file)
-	if err != nil {
-		log.WithError(err).Warnln("解壓資料失敗")
-	}
-}
-
-func updateEssentialInformation(dbfile *string) {
-	model.InitDBModel(*dbfile)
 	request = false
 	for !request {
 		if downloadDealerInfo() {
@@ -540,7 +419,6 @@ func updateEssentialInformation(dbfile *string) {
 				log.Infoln("暫停1分鐘")
 				time.Sleep(time.Minute)
 			}
-
 		} else {
 			log.Infoln("暫停1分鐘")
 			time.Sleep(time.Minute)
@@ -552,7 +430,6 @@ func updateEssentialInformation(dbfile *string) {
 		readStockList()
 	}
 	log.Infoln("更新股票資訊成功")
-
 }
 
 func writingRoutine(tasks chan string) {
@@ -643,10 +520,10 @@ func ScheduleTaskWithSkipWeekends(hour, minute, second int, task func()) {
 	}()
 }
 
-func downloadRutine(dbfile string, writedb bool, tasks chan string, date string) {
-	slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
-	updateEssentialInformation(&dbfile)
-	if writedb {
+func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, date string) {
+	// slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
+	updateEssentialInformation(sqlitefile, postgresDSN)
+	if sqlitefile != "" || postgresDSN != "" {
 		wg.Add(1)
 		tasks = make(chan string, 16)
 		go writingRoutine(tasks)
@@ -661,46 +538,50 @@ func downloadRutine(dbfile string, writedb bool, tasks chan string, date string)
 		count++
 
 		if count == 10 {
-			slackWebhook.SentMessage("今日無交易")
+			// slackWebhook.SentMessage("今日無交易")
 			return
 		}
 	}
 
-	slackWebhook.SentMessage("開始下載今日交易籌碼")
+	// slackWebhook.SentMessage("開始下載今日交易籌碼")
 
 	createDir()
 	start := time.Now()
 	for _, s := range stocks {
 		nodata = false
 		downloadChip(&s.id)
-		if !nodata && writedb {
+		if !nodata && (sqlitefile != "" || postgresDSN != "") {
 			tasks <- s.id
 		}
-		log.Infoln("暫停2秒")
-		time.Sleep(2 * time.Second)
+		log.Infoln("暫停1~5秒")
+		time.Sleep(time.Duration(1+rand.Intn(5)) * time.Second)
 	}
 	elapsed := time.Since(start)
 	log.WithFields(log.Fields{
 		"matchCount/requestImageCount": float64(matchCount) / float64(requestImageCount),
-	}).Info("captcha 正確率")
+	}).Info("CAPTCHA 正確率")
 	log.WithFields(log.Fields{
 		"elapsed": elapsed,
 	}).Printf("下載用時")
-	slackWebhook.SentMessage("下載今日交易籌碼成功")
-	if writedb {
+	// slackWebhook.SentMessage("下載今日交易籌碼成功")
+	if sqlitefile != "" || postgresDSN != "" {
 		tasks <- "close"
 		wg.Wait()
 	}
-	compressFolder()
-	slackWebhook.SentMessage("歸檔今日交易籌碼成功")
+	err := gotool.CompressFolder(today)
+	if err != nil {
+		log.WithError(err).Warnln("壓縮檔案失敗")
+	}
+	// slackWebhook.SentMessage("歸檔今日交易籌碼成功")
 }
 
 func main() {
 	runtime.GOMAXPROCS(2)
-	const version = "v2.3.0"
-	var writedb bool
+	const version = "v3.0.1"
 	var tasks chan string
-	var dbfile string
+	sqlitefile := ""
+	postgresconfig := ""
+	postgresDSN := ""
 
 	cli.VersionFlag = &cli.BoolFlag{
 		Name:    "version",
@@ -728,17 +609,24 @@ func main() {
 				DefaultText: "info",
 			},
 			&cli.BoolFlag{
-				Name:    "nowritedb",
+				Name:    "nowritesqlite",
 				Aliases: []string{"n"},
 				Usage:   "不寫入sqlite資料庫",
 				Value:   false,
 			},
 			&cli.StringFlag{
-				Name:        "dbfile",
+				Name:        "sqlitefile",
 				Aliases:     []string{"f"},
 				Usage:       "指定sqlite數據庫檔案",
 				Value:       "./twstockchip.sqlite",
 				DefaultText: "./twstockchip.sqlite",
+			},
+			&cli.StringFlag{
+				Name:        "postgresconfig",
+				Aliases:     []string{"p"},
+				Usage:       "指定postgres數據庫配置",
+				Value:       "",
+				DefaultText: "",
 			},
 		},
 
@@ -757,8 +645,19 @@ func main() {
 			case "panic":
 				log.SetLevel(log.PanicLevel)
 			}
-			writedb = !c.Bool("nowritedb")
-			dbfile = c.String("dbfile")
+			if !c.Bool("nowritesqlite") {
+				sqlitefile = c.String("sqlitefile")
+			}
+			postgresconfig = c.String("postgresconfig")
+			if postgresconfig != "" {
+				pconfig, err := config.LoadPostgreConfig(postgresconfig)
+				if err != nil {
+					log.WithError(err).Fatalln("讀取PostgreSQL配置失敗")
+				} else {
+					postgresDSN = model.BuildPostgresDSN(pconfig)
+				}
+			}
+
 			return nil
 		},
 
@@ -768,17 +667,26 @@ func main() {
 				Aliases: []string{"r"},
 				Usage:   "指定日期重新建立資料庫",
 				Action: func(c *cli.Context) error {
-					updateEssentialInformation(&dbfile)
-					fileList := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
+					updateEssentialInformation(sqlitefile, postgresDSN)
+					fileList, err := gotool.DirRegListFiles("./csv", "^[0-9]...-[0-1][0-9]-[0-3][0-9].tar.zst")
+					if err != nil {
+						log.WithError(err).Warnln("讀取檔案列表失敗")
+					}
 					reg, _ := regexp.Compile("[0-9]...-[0-1][0-9]-[0-3][0-9]")
 					firstDate, _ := time.Parse("2006-01-02", c.String("date"))
 					for _, fileName := range fileList {
 						dateString := reg.FindString(*fileName)
 						fileDate, _ := time.Parse("2006-01-02", dateString)
 						if firstDate.Before(fileDate) || firstDate.Equal(fileDate) {
-							uncompressFolder(fileName)
+							err := gotool.UncompressFolder(fileName)
+							if err != nil {
+								log.WithError(err).Warnln("解壓縮檔案失敗")
+							}
 							folder := "./" + dateString
-							csvFileList := gotool.DirRegListFiles(folder, ".*csv$")
+							csvFileList, err := gotool.DirRegListFiles(folder, ".*csv$")
+							if err != nil {
+								log.WithError(err).Warnln("讀取檔案列表失敗")
+							}
 							for _, csvFile := range csvFileList {
 								csvNameSlice := strings.Split(*csvFile, "/")
 								nameWithExtension := csvNameSlice[2]
@@ -796,7 +704,7 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "下載指定日期交易籌碼 (需交易所網頁釋出)",
 				Action: func(c *cli.Context) error {
-					downloadRutine(dbfile, writedb, tasks, c.String("date"))
+					downloadRutine(sqlitefile, postgresDSN, tasks, c.String("date"))
 					return nil
 				},
 			},
@@ -809,11 +717,11 @@ func main() {
 					ScheduleTaskWithSkipWeekends(16, 30, 0, func() {
 						requestImageCount = 0
 						matchCount = 0
-						downloadRutine(dbfile, writedb, tasks, time.Now().Format("2006-01-02"))
+						downloadRutine(sqlitefile, postgresDSN, tasks, time.Now().Format("2006-01-02"))
 					})
 					// Keep the main function running
 					select {}
-					return nil
+					// return nil
 				},
 			},
 		},

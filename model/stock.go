@@ -14,11 +14,20 @@ type Stock struct {
 }
 
 func SmartAddStock(code *string, name *string) {
-	if err := DB.Where("Code = ?", code).First(&Stock{}).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		DB.Create(&Stock{Code: code, Name: name})
-		log.WithFields(log.Fields{
-			"code": *code,
-			"name": *name,
-		}).Infoln("新增股票")
+	addStockToDB := func(db *gorm.DB) {
+		if db == nil {
+			return
+		}
+		if err := db.Where("Code = ?", code).First(&Stock{}).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			db.Create(&Stock{Code: code, Name: name})
+			log.WithFields(log.Fields{
+				"code": *code,
+				"name": *name,
+			}).Infoln("新增 Stock 到資料庫")
+		}
+	}
+
+	for _, db := range []*gorm.DB{SqliteDB, PostgresDB} {
+		addStockToDB(db)
 	}
 }
