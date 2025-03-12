@@ -20,7 +20,7 @@ twstockship [global options] command [command options] [arguments...]
 
 ## VERSION
 
-v3.0.1
+v3.0.2
 
 ## COMMANDS
 

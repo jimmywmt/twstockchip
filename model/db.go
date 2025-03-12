@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jimmywmt/twstockchip/config"
 	gorm_logrus "github.com/onrik/gorm-logrus"
@@ -44,7 +45,11 @@ func InitDBModel(sqliteFile string, postgresDSN string) {
 		if err != nil {
 			log.WithError(err).Fatalln("連結SQLite資料庫失敗")
 		}
-		SqliteDB.AutoMigrate(&Stock{}, &Dealer{}, &Transaction{})
+		err := SqliteDB.AutoMigrate(&Stock{}, &Dealer{}, &Transaction{})
+		if err != nil {
+			log.WithError(err).Fatalln("建立SQLite資料表失敗")
+			os.Exit(1)
+		}
 	}
 
 	if postgresDSN != "" {
@@ -55,6 +60,10 @@ func InitDBModel(sqliteFile string, postgresDSN string) {
 		if err != nil {
 			log.WithError(err).Fatalln("連結PostgreSQL資料庫失敗")
 		}
-		PostgresDB.AutoMigrate(&Stock{}, &Dealer{}, &Transaction{})
+		err := PostgresDB.AutoMigrate(&Stock{}, &Dealer{}, &Transaction{})
+		if err != nil {
+			log.WithError(err).Fatalln("建立PostgreSQL資料表失敗")
+			os.Exit(1)
+		}
 	}
 }

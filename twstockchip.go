@@ -169,7 +169,11 @@ func generateDownloadCollector() *colly.Collector {
 				}
 			})
 
-			c.Visit("https://bsr.twse.com.tw/bshtm/bsContent.aspx")
+			err := c.Visit("https://bsr.twse.com.tw/bshtm/bsContent.aspx")
+			if err != nil {
+				log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsContent.aspx) 失敗")
+				request = false
+			}
 
 			if request {
 				success = true
@@ -207,7 +211,11 @@ func downloadChip(target *string) {
 	for !success {
 		request = true
 		c := generateImageCollector()
-		c.Visit("https://bsr.twse.com.tw/bshtm/bsMenu.aspx")
+		err := c.Visit("https://bsr.twse.com.tw/bshtm/bsMenu.aspx")
+		if err != nil {
+			log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsMenu.aspx) 失敗")
+			request = false
+		}
 		if !request {
 			log.Infoln("暫停1分鐘")
 			time.Sleep(time.Minute)
@@ -231,7 +239,11 @@ func downloadChip(target *string) {
 
 		c2 := generateDownloadCollector()
 		if len(s) == 5 {
-			c2.Post("https://bsr.twse.com.tw/bshtm/bsMenu.aspx", formData)
+			err := c2.Post("https://bsr.twse.com.tw/bshtm/bsMenu.aspx", formData)
+			if err != nil {
+				log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsMenu.aspx) 失敗")
+				request = false
+			}
 		} else {
 			log.WithFields(log.Fields{
 				"CAPTCHA string": s,
@@ -300,7 +312,11 @@ func readStockList() {
 		}
 	})
 
-	c.Visit("https://isin.twse.com.tw/isin/C_public.jsp?strMode=2")
+	err := c.Visit("https://isin.twse.com.tw/isin/C_public.jsp?strMode=2")
+	if err != nil {
+		log.WithError(err).Warnln("訪問 URL (https://isin.twse.com.tw/isin/C_public.jsp?strMode=2) 失敗")
+		os.Exit(1)
+	}
 }
 
 func checkToday() bool {
@@ -340,7 +356,11 @@ func checkToday() bool {
 		log.WithError(err).Warnln("訪問 URL:", r.Request.URL, "失敗")
 	})
 
-	c.Visit("https://bsr.twse.com.tw/bshtm/bsWelcome.aspx")
+	err := c.Visit("https://bsr.twse.com.tw/bshtm/bsWelcome.aspx")
+	if err != nil {
+		log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsWelcome.aspx) 失敗")
+		os.Exit(1)
+	}
 
 	return check
 }
@@ -375,7 +395,11 @@ func downloadDealerInfo() bool {
 				log.Infoln("下載股票交易所資料成功")
 			}
 		})
-		c.Visit("https://www.twse.com.tw/rwd/zh/brokerService/outPutExcel")
+		err := c.Visit("https://www.twse.com.tw/rwd/zh/brokerService/outPutExcel")
+		if err != nil {
+			log.WithError(err).Warnln("訪問 URL (https://www.twse.com.tw/rwd/zh/brokerService/outPutExcel) 失敗")
+			request = false
+		}
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
@@ -383,7 +407,11 @@ func downloadDealerInfo() bool {
 		result = false
 	})
 
-	c.Visit("https://www.twse.com.tw/brokerService/brokerServiceAudit")
+	err := c.Visit("https://www.twse.com.tw/brokerService/brokerServiceAudit")
+	if err != nil {
+		log.WithError(err).Warnln("訪問 URL (https://www.twse.com.tw/brokerService/brokerServiceAudit) 失敗")
+		result = false
+	}
 	return result
 }
 
@@ -577,7 +605,7 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 
 func main() {
 	runtime.GOMAXPROCS(2)
-	const version = "v3.0.1"
+	const version = "v3.0.2"
 	var tasks chan string
 	sqlitefile := ""
 	postgresconfig := ""

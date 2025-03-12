@@ -68,13 +68,13 @@ func ReadCSV(filepath string, stockCode string, date string) {
 	var sqliteStockID, postgresStockID uint
 
 	// 打開 CSV 檔案
-	data, err := os.OpenFile(filepath, os.O_RDONLY, 0777)
-	defer data.Close()
-
+	data, err := os.OpenFile(filepath, os.O_RDONLY, 0o777)
 	if err != nil {
 		log.WithError(err).Warningln("開啓檔案失敗")
 		return
 	}
+
+	defer data.Close()
 
 	reader := csv.NewReader(data)
 	trans := make([]model.Transaction, 0, 512)
