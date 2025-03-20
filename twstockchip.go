@@ -42,7 +42,6 @@ var (
 	matchCount                                      = 0
 )
 
-// var slackwebhookurl = "https://hooks.slack.com/services/t1w9v7r3r/b032t7g6na2/zpij5nj9upufqvrgtgweb2ft"
 var wg sync.WaitGroup
 
 func init() {
@@ -549,7 +548,6 @@ func ScheduleTaskWithSkipWeekends(hour, minute, second int, task func()) {
 }
 
 func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, date string) {
-	// slackWebhook := gotool.NewSlackWebhook(slackWebhookURL)
 	updateEssentialInformation(sqlitefile, postgresDSN)
 	if sqlitefile != "" || postgresDSN != "" {
 		wg.Add(1)
