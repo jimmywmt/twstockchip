@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -83,7 +82,7 @@ func generateImageCollector() *colly.Collector {
 			err := os.WriteFile(imgFile, body, 0o755)
 
 			if err != nil {
-				log.WithError(err).Warnln("連接失敗")
+				log.WithError(err).Warnln("寫入 CAPTCHA 圖片失敗")
 				request = false
 			} else {
 				log.Infoln("下載 CAPTCHA 圖片成功")
@@ -92,7 +91,6 @@ func generateImageCollector() *colly.Collector {
 
 		err := c.Visit(img_addr)
 		if err != nil {
-			log.WithError(err).Warnln("訪問 CAPTCHA 圖片失敗")
 			request = false
 		}
 
@@ -101,7 +99,7 @@ func generateImageCollector() *colly.Collector {
 
 			err := tool.ProcessImage(imgFile, "img.jpeg")
 			if err != nil {
-				fmt.Println("Error processing image:", err)
+				log.WithError(err).Warnln("處理圖片失敗")
 				return
 			}
 
@@ -159,7 +157,7 @@ func generateDownloadCollector() *colly.Collector {
 				err := os.WriteFile("./csv/"+today+"/"+stockCode+".csv", body, 0o755)
 
 				if err != nil {
-					log.Warnln(err)
+					log.WithError(err).Warnln("寫入交易籌碼檔案失敗")
 					request = false
 				} else {
 					log.WithFields(log.Fields{
@@ -170,7 +168,6 @@ func generateDownloadCollector() *colly.Collector {
 
 			err := c.Visit("https://bsr.twse.com.tw/bshtm/bsContent.aspx")
 			if err != nil {
-				log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsContent.aspx) 失敗")
 				request = false
 			}
 
@@ -212,7 +209,6 @@ func downloadChip(target *string) {
 		c := generateImageCollector()
 		err := c.Visit("https://bsr.twse.com.tw/bshtm/bsMenu.aspx")
 		if err != nil {
-			log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsMenu.aspx) 失敗")
 			request = false
 		}
 		if !request {
@@ -240,7 +236,7 @@ func downloadChip(target *string) {
 		if len(s) == 5 {
 			err := c2.Post("https://bsr.twse.com.tw/bshtm/bsMenu.aspx", formData)
 			if err != nil {
-				log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsMenu.aspx) 失敗")
+				log.WithError(err).Warnln("訪問 URL: (https://bsr.twse.com.tw/bshtm/bsMenu.aspx) 失敗")
 				request = false
 			}
 		} else {
@@ -255,8 +251,8 @@ func downloadChip(target *string) {
 			continue
 		}
 		if !success {
-			log.Infoln("暫停1~5秒")
-			time.Sleep(time.Duration(1+rand.Intn(5)) * time.Second)
+			log.Infoln("暫停3~5秒")
+			time.Sleep(time.Duration(3+rand.Intn(3)) * time.Second)
 		}
 
 	}
@@ -313,7 +309,6 @@ func readStockList() {
 
 	err := c.Visit("https://isin.twse.com.tw/isin/C_public.jsp?strMode=2")
 	if err != nil {
-		log.WithError(err).Warnln("訪問 URL (https://isin.twse.com.tw/isin/C_public.jsp?strMode=2) 失敗")
 		os.Exit(1)
 	}
 }
@@ -357,7 +352,6 @@ func checkToday() bool {
 
 	err := c.Visit("https://bsr.twse.com.tw/bshtm/bsWelcome.aspx")
 	if err != nil {
-		log.WithError(err).Warnln("訪問 URL (https://bsr.twse.com.tw/bshtm/bsWelcome.aspx) 失敗")
 		os.Exit(1)
 	}
 
@@ -396,7 +390,6 @@ func downloadDealerInfo() bool {
 		})
 		err := c.Visit("https://www.twse.com.tw/rwd/zh/brokerService/outPutExcel")
 		if err != nil {
-			log.WithError(err).Warnln("訪問 URL (https://www.twse.com.tw/rwd/zh/brokerService/outPutExcel) 失敗")
 			request = false
 		}
 	})
@@ -408,7 +401,6 @@ func downloadDealerInfo() bool {
 
 	err := c.Visit("https://www.twse.com.tw/brokerService/brokerServiceAudit")
 	if err != nil {
-		log.WithError(err).Warnln("訪問 URL (https://www.twse.com.tw/brokerService/brokerServiceAudit) 失敗")
 		result = false
 	}
 	return result
@@ -579,8 +571,8 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 		if !nodata && (sqlitefile != "" || postgresDSN != "") {
 			tasks <- s.id
 		}
-		log.Infoln("暫停1~5秒")
-		time.Sleep(time.Duration(1+rand.Intn(5)) * time.Second)
+		log.Infoln("暫停3~5秒")
+		time.Sleep(time.Duration(3+rand.Intn(3)) * time.Second)
 	}
 	elapsed := time.Since(start)
 	log.WithFields(log.Fields{
