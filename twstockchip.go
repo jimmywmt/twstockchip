@@ -555,12 +555,10 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 		count++
 
 		if count == 10 {
-			// slackWebhook.SentMessage("今日無交易")
+			log.Warnln("今日無交易")
 			return
 		}
 	}
-
-	// slackWebhook.SentMessage("開始下載今日交易籌碼")
 
 	createDir()
 	start := time.Now()
@@ -580,7 +578,6 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 	log.WithFields(log.Fields{
 		"elapsed": elapsed,
 	}).Printf("下載用時")
-	// slackWebhook.SentMessage("下載今日交易籌碼成功")
 	if sqlitefile != "" || postgresDSN != "" {
 		tasks <- "close"
 		wg.Wait()
@@ -589,7 +586,6 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 	if err != nil {
 		log.WithError(err).Warnln("壓縮檔案失敗")
 	}
-	// slackWebhook.SentMessage("歸檔今日交易籌碼成功")
 }
 
 func main() {
