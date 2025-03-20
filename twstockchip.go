@@ -236,7 +236,6 @@ func downloadChip(target *string) {
 		if len(s) == 5 {
 			err := c2.Post("https://bsr.twse.com.tw/bshtm/bsMenu.aspx", formData)
 			if err != nil {
-				log.WithError(err).Warnln("訪問 URL: (https://bsr.twse.com.tw/bshtm/bsMenu.aspx) 失敗")
 				request = false
 			}
 		} else {
