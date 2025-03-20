@@ -85,8 +85,8 @@ func RemoveSmallRegions(img image.Image, minSize int) image.Image {
 	}
 
 	// Label all black regions
-	for y := 0; y < bounds.Dy(); y++ {
-		for x := 0; x < bounds.Dx(); x++ {
+	for y := range bounds.Dy() {
+		for x := range bounds.Dx() {
 			if labels[y][x] == 0 {
 				px := color.GrayModel.Convert(img.At(bounds.Min.X+x, bounds.Min.Y+y)).(color.Gray)
 				if px.Y == 0 { // Black pixel
@@ -99,8 +99,8 @@ func RemoveSmallRegions(img image.Image, minSize int) image.Image {
 
 	// Remove regions smaller than minSize
 	output := imaging.Clone(img)
-	for y := 0; y < bounds.Dy(); y++ {
-		for x := 0; x < bounds.Dx(); x++ {
+	for y := range bounds.Dy() {
+		for x := range bounds.Dx() {
 			if labels[y][x] > 0 && area[labels[y][x]] < minSize {
 				output.Set(bounds.Min.X+x, bounds.Min.Y+y, color.Gray{Y: 255}) // Set to white
 			}
@@ -148,8 +148,8 @@ func RemoveSmallWhiteRegions(img image.Image, minWidth, minHeight int) image.Ima
 	}
 
 	// 逐像素標記區域
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			if labels[y][x] == 0 {
 				size := 0
 				floodFill(x, y, label, &size)
@@ -163,8 +163,8 @@ func RemoveSmallWhiteRegions(img image.Image, minWidth, minHeight int) image.Ima
 
 	// 過濾小於 minWidth * minHeight 的區域
 	output := image.NewGray(bounds)
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			if regionSizes[labels[y][x]] < minWidth*minHeight {
 				output.Set(bounds.Min.X+x, bounds.Min.Y+y, color.Gray{Y: 0}) // 設為黑色
 			} else {
