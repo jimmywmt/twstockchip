@@ -250,8 +250,8 @@ func downloadChip(target *string) {
 			continue
 		}
 		if !success {
-			log.Infoln("暫停4~6秒")
-			time.Sleep(time.Duration(4+rand.Intn(3)) * time.Second)
+			log.Infoln("暫停6~8秒")
+			time.Sleep(time.Duration(6+rand.Intn(3)) * time.Second)
 		}
 
 	}
@@ -568,8 +568,8 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 		if !nodata && (sqlitefile != "" || postgresDSN != "") {
 			tasks <- s.id
 		}
-		log.Infoln("暫停4~6秒")
-		time.Sleep(time.Duration(4+rand.Intn(3)) * time.Second)
+		log.Infoln("暫停6~8秒")
+		time.Sleep(time.Duration(6+rand.Intn(3)) * time.Second)
 	}
 	elapsed := time.Since(start)
 	log.WithFields(log.Fields{
