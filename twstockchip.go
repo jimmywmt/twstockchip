@@ -107,6 +107,8 @@ func generateImageCollector() *colly.Collector {
 
 			out, _ := cmd.Output()
 			s = gotool.CompressStr(string(out))
+			log.Infoln("暫停1~3秒")
+			time.Sleep(time.Duration(1+rand.Intn(3)) * time.Second)
 		}
 	})
 
@@ -212,8 +214,10 @@ func downloadChip(target *string) {
 			request = false
 		}
 		if !request {
-			log.Infoln("暫停1分鐘")
-			time.Sleep(time.Minute)
+			// log.Infoln("暫停1分鐘")
+			// time.Sleep(time.Minute)
+			log.Infoln("暫停30秒")
+			time.Sleep(time.Second * 30)
 			continue
 		}
 
@@ -245,13 +249,15 @@ func downloadChip(target *string) {
 		}
 
 		if !request {
-			log.Infoln("暫停1分鐘")
-			time.Sleep(time.Minute)
+			// log.Infoln("暫停1分鐘")
+			// time.Sleep(time.Minute)
+			log.Infoln("暫停30秒")
+			time.Sleep(time.Second * 30)
 			continue
 		}
 		if !success {
-			log.Infoln("暫停6~8秒")
-			time.Sleep(time.Duration(6+rand.Intn(3)) * time.Second)
+			log.Infoln("暫停4~6秒")
+			time.Sleep(time.Duration(4+rand.Intn(3)) * time.Second)
 		}
 
 	}
@@ -434,12 +440,16 @@ func updateEssentialInformation(sqlitefile string, postgresDSN string) {
 			if dealerreader.ReadDealerXLS("./dealers.xls") {
 				request = true
 			} else {
-				log.Infoln("暫停1分鐘")
-				time.Sleep(time.Minute)
+				// log.Infoln("暫停1分鐘")
+				// time.Sleep(time.Minute)
+				log.Infoln("暫停30秒")
+				time.Sleep(time.Second * 30)
 			}
 		} else {
-			log.Infoln("暫停1分鐘")
-			time.Sleep(time.Minute)
+			// log.Infoln("暫停1分鐘")
+			// time.Sleep(time.Minute)
+			log.Infoln("暫停30秒")
+			time.Sleep(time.Second * 30)
 		}
 	}
 
@@ -550,8 +560,10 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 
 	count := 0
 	for !checkToday() {
-		log.Infoln("暫停1分鐘")
-		time.Sleep(time.Minute)
+		// log.Infoln("暫停1分鐘")
+		// time.Sleep(time.Minute)
+		log.Infoln("暫停30秒")
+		time.Sleep(time.Second * 30)
 		count++
 
 		if count == 10 {
@@ -568,8 +580,8 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 		if !nodata && (sqlitefile != "" || postgresDSN != "") {
 			tasks <- s.id
 		}
-		log.Infoln("暫停6~8秒")
-		time.Sleep(time.Duration(6+rand.Intn(3)) * time.Second)
+		log.Infoln("暫停4~6秒")
+		time.Sleep(time.Duration(4+rand.Intn(3)) * time.Second)
 	}
 	elapsed := time.Since(start)
 	log.WithFields(log.Fields{
