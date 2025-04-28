@@ -20,7 +20,7 @@ twstockship [global options] command [command options] [arguments...]
 
 ## VERSION
 
-v3.0.2
+v3.1.0
 
 ## COMMANDS
 
@@ -36,6 +36,7 @@ help, h Shows a list of commands or help for one command
 (default: info)  
 --nowritesqlite, -n 不寫入sqlite資料庫 (default: false)  
 --postgresconfig value, -p value 指定postgres數據庫配置  
---sqlitefile value, -f value 指定sqlite數據庫檔案 (default: ./twstockchip.sqlite)  
+--sqlitefile value, -f value 指定sqlite數據庫檔案 (default:
+./twstockchip.sqlite)  
 --help, -h show help  
 --version, -v 顯示版本 (default: false)

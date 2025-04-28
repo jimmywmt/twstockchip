@@ -9,6 +9,7 @@ require (
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/jimmywmt/gotool v1.0.0
 	github.com/onrik/gorm-logrus v0.5.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/shakinm/xlsReader v0.9.12
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.5

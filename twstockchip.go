@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"github.com/jimmywmt/twstockchip/dealerreader"
 	"github.com/jimmywmt/twstockchip/model"
 	"github.com/jimmywmt/twstockchip/tool"
+	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/exp/rand"
@@ -478,74 +480,35 @@ func writingRoutine(tasks chan string) {
 	}
 }
 
-func ScheduleTask(hour, minute, second int, task func()) {
-	go func() {
-		for {
-			// Get the current time
-			now := time.Now()
+// 每天特定時間執行，並跳過週末，使用 Asia/Taipei 時區
+func ScheduleTaskWithSkipWeekends(hour, minute, second int, task func()) *cron.Cron {
+	// 載入台北時區
+	loc, err := time.LoadLocation("Asia/Taipei")
+	if err != nil {
+		log.WithError(err).Fatalln("載入時區失敗")
+		return nil
+	}
 
-			// Calculate the next scheduled time
-			nextRun := time.Date(
-				now.Year(),
-				now.Month(),
-				now.Day(),
-				hour,
-				minute,
-				second,
-				0,
-				now.Location(),
-			)
+	// 建立 cron 排程器，支援秒級，設定時區
+	c := cron.New(
+		cron.WithSeconds(),
+		cron.WithLocation(loc),
+	)
 
-			// If the next scheduled time is in the past, schedule for the next day
-			if nextRun.Before(now) {
-				nextRun = nextRun.Add(24 * time.Hour)
-			}
+	// 建立 cron 表達式：秒 分 時 日 月 星期（1-5 表示週一到週五）
+	spec := fmt.Sprintf("%d %d %d * * 1-5", second, minute, hour)
 
-			// Wait until the next scheduled time
-			time.Sleep(time.Until(nextRun))
+	// 加入排程任務
+	_, err = c.AddFunc(spec, task)
+	if err != nil {
+		log.WithError(err).Fatalln("排程任務失敗")
+		return nil
+	}
 
-			// Execute the task
-			task()
-		}
-	}()
-}
-
-// ScheduleTaskWithSkipWeekends schedules a task to run at a specific time every weekday
-func ScheduleTaskWithSkipWeekends(hour, minute, second int, task func()) {
-	go func() {
-		for {
-			// Get the current time
-			now := time.Now()
-
-			// Calculate the next scheduled time
-			nextRun := time.Date(
-				now.Year(),
-				now.Month(),
-				now.Day(),
-				hour,
-				minute,
-				second,
-				0,
-				now.Location(),
-			)
-
-			// If the next scheduled time is in the past, schedule for the next day
-			if nextRun.Before(now) {
-				nextRun = nextRun.Add(24 * time.Hour)
-			}
-
-			// Skip weekends (Saturday and Sunday)
-			for nextRun.Weekday() == time.Saturday || nextRun.Weekday() == time.Sunday {
-				nextRun = nextRun.Add(24 * time.Hour)
-			}
-
-			// Wait until the next scheduled time
-			time.Sleep(time.Until(nextRun))
-
-			// Execute the task
-			task()
-		}
-	}()
+	// 啟動排程器
+	c.Start()
+	log.Infoln("排程任務啟動在每個工作日的", hour, ":", minute, ":", second)
+	return c
 }
 
 func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, date string) {
@@ -602,7 +565,7 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 
 func main() {
 	runtime.GOMAXPROCS(2)
-	const version = "v3.0.2"
+	const version = "v3.1.0"
 	var tasks chan string
 	sqlitefile := ""
 	postgresconfig := ""
