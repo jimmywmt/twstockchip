@@ -218,8 +218,8 @@ func downloadChip(target *string) {
 		if !request {
 			// log.Infoln("暫停1分鐘")
 			// time.Sleep(time.Minute)
-			log.Infoln("暫停30秒")
-			time.Sleep(time.Second * 30)
+			log.Infoln("暫停15秒")
+			time.Sleep(time.Second * 15)
 			continue
 		}
 
@@ -253,8 +253,8 @@ func downloadChip(target *string) {
 		if !request {
 			// log.Infoln("暫停1分鐘")
 			// time.Sleep(time.Minute)
-			log.Infoln("暫停30秒")
-			time.Sleep(time.Second * 30)
+			log.Infoln("暫停15秒")
+			time.Sleep(time.Second * 15)
 			continue
 		}
 		if !success {
@@ -277,7 +277,7 @@ func readStockList() {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	})
 
-	c.SetRequestTimeout(30 * time.Second)
+	c.SetRequestTimeout(15 * time.Second)
 
 	c.OnRequest(func(r *colly.Request) {
 		r.ResponseCharacterEncoding = "big5"
@@ -444,14 +444,14 @@ func updateEssentialInformation(sqlitefile string, postgresDSN string) {
 			} else {
 				// log.Infoln("暫停1分鐘")
 				// time.Sleep(time.Minute)
-				log.Infoln("暫停30秒")
-				time.Sleep(time.Second * 30)
+				log.Infoln("暫停15秒")
+				time.Sleep(time.Second * 15)
 			}
 		} else {
 			// log.Infoln("暫停1分鐘")
 			// time.Sleep(time.Minute)
-			log.Infoln("暫停30秒")
-			time.Sleep(time.Second * 30)
+			log.Infoln("暫停15秒")
+			time.Sleep(time.Second * 15)
 		}
 	}
 
@@ -525,8 +525,8 @@ func downloadRutine(sqlitefile string, postgresDSN string, tasks chan string, da
 	for !checkToday() {
 		// log.Infoln("暫停1分鐘")
 		// time.Sleep(time.Minute)
-		log.Infoln("暫停30秒")
-		time.Sleep(time.Second * 30)
+		log.Infoln("暫停15秒")
+		time.Sleep(time.Second * 15)
 		count++
 
 		if count == 10 {
